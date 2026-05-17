@@ -11,7 +11,7 @@ import { createProduct } from "@/lib/services/products";
 export const Route = createFileRoute("/vendor")({ component: Vendor });
 
 function Vendor() {
-  useRequireRole(["vendor"]);
+  useRequireRole(["vendor", "admin"]);
   const { profile } = useAuth();
   const [showForm, setShowForm] = useState(false);
   const [title, setTitle] = useState("");
@@ -44,37 +44,40 @@ function Vendor() {
   };
   return (
     <AppShell>
-      <PageHeader title="Vendor Dashboard" subtitle={profile?.businessName ?? profile?.name ?? "Spice Route Kitchen"} />
+      <PageHeader title="Admin Dashboard" subtitle={profile?.businessName ?? profile?.name ?? "Food manager"} />
       <div className="p-5 space-y-5">
         {/* Status */}
         <div className="p-4 rounded-2xl bg-gradient-ai text-white shadow-ai flex items-center gap-3">
           <div className="w-11 h-11 rounded-xl bg-white/20 grid place-items-center"><BadgeCheck className="w-5 h-5" /></div>
           <div className="flex-1">
-            <div className="font-semibold text-sm flex items-center gap-1.5">AI Verified Vendor <Sparkles className="w-3.5 h-3.5" /></div>
+            <div className="font-semibold text-sm flex items-center gap-1.5">Food Admin <Sparkles className="w-3.5 h-3.5" /></div>
             <div className="text-xs opacity-90">FSSAI cert valid till Mar 2027 · Trust 98%</div>
           </div>
         </div>
 
         {/* Analytics */}
         <div className="grid grid-cols-2 gap-3">
-          <Stat icon={IndianRupee} label="Today" value="₹12,480" delta="+18%" gradient="bg-gradient-warm" />
-          <Stat icon={Package} label="Orders" value="47" delta="+6" />
-          <Stat icon={TrendingUp} label="This week" value="₹86k" delta="+24%" />
-          <Stat icon={FileCheck} label="Inventory" value="48 items" sub="3 low stock" />
+          <Stat icon={IndianRupee} label="Today" value={`₹${liveOrders.reduce((sum, order) => sum + order.total, 0)}`} gradient="bg-gradient-warm" />
+          <Stat icon={Package} label="Orders" value={String(liveOrders.length)} />
+          <Stat icon={TrendingUp} label="Live" value={String(liveOrders.filter((o) => o.status !== "DELIVERED").length)} />
+          <Stat icon={FileCheck} label="Inventory" value={`${products.length} items`} />
         </div>
 
         {/* Active orders */}
         <Section title="Active orders" right={<span className="text-xs text-muted-foreground">{liveOrders.filter((o) => o.status !== "DELIVERED").length} live</span>}>
-          {[1,2,3].map((i) => (
-            <div key={i} className="flex items-center gap-3 p-3 bg-card border border-border rounded-2xl">
-              <div className="w-10 h-10 rounded-xl bg-primary/10 text-primary grid place-items-center font-bold">#{84 + i}</div>
+          {liveOrders.filter((o) => o.status !== "DELIVERED").map((order) => (
+            <div key={order.id} className="flex items-center gap-3 p-3 bg-card border border-border rounded-2xl">
+              <div className="w-10 h-10 rounded-xl bg-primary/10 text-primary grid place-items-center font-bold">#{order.id.slice(-2)}</div>
               <div className="flex-1">
-                <div className="font-semibold text-sm">2× Butter Paneer · 1× Naan</div>
-                <div className="text-xs text-muted-foreground">₹{349 + i*40} · Indiranagar</div>
+                <div className="font-semibold text-sm">{order.items.map((item) => `${item.qty}x ${item.name}`).join(" · ")}</div>
+                <div className="text-xs text-muted-foreground">₹{order.total} · {order.status}</div>
               </div>
-              <button className="px-3 py-1.5 text-xs font-bold bg-primary text-primary-foreground rounded-lg">Accept</button>
+              <span className="px-3 py-1.5 text-xs font-bold bg-accent rounded-lg">{order.status}</span>
             </div>
           ))}
+          {liveOrders.filter((o) => o.status !== "DELIVERED").length === 0 && (
+            <div className="p-3 bg-card border border-border rounded-2xl text-sm text-muted-foreground">No active orders yet.</div>
+          )}
         </Section>
 
         {/* Products */}

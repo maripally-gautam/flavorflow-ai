@@ -4,24 +4,22 @@ import {
   deleteDoc,
   doc,
   onSnapshot,
-  orderBy,
   query,
   serverTimestamp,
   updateDoc,
   where,
 } from "firebase/firestore";
 import { firestore } from "@/lib/firebase";
-import { products as mockProducts, vendors as mockVendors } from "@/lib/mock-data";
 import type { LiveProduct, VendorProfile } from "@/lib/types";
 
 export function listenProducts(cb: (products: LiveProduct[]) => void, vendorId?: string) {
   if (!firestore) {
-    cb(vendorId ? mockProducts.filter((p) => p.vendorId === vendorId) : mockProducts);
+    cb([]);
     return () => undefined;
   }
   const constraints = vendorId
-    ? [where("vendorId", "==", vendorId), orderBy("createdAt", "desc")]
-    : [where("active", "!=", false), orderBy("active"), orderBy("createdAt", "desc")];
+    ? [where("vendorId", "==", vendorId)]
+    : [];
   return onSnapshot(query(collection(firestore, "products"), ...constraints), (snap) => {
     cb(snap.docs.map((d) => ({ id: d.id, ...d.data() }) as LiveProduct));
   });
@@ -29,7 +27,7 @@ export function listenProducts(cb: (products: LiveProduct[]) => void, vendorId?:
 
 export function listenVendors(cb: (vendors: VendorProfile[]) => void) {
   if (!firestore) {
-    cb(mockVendors.map((v) => ({ id: v.id, ownerId: v.id, name: v.name, verified: v.verified, trustScore: 98 })));
+    cb([]);
     return () => undefined;
   }
   return onSnapshot(collection(firestore, "vendors"), (snap) => {

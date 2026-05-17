@@ -1,6 +1,6 @@
 import type { Product } from "./mock-data";
 
-export type UserRole = "customer" | "vendor" | "delivery";
+export type UserRole = "customer" | "vendor" | "admin" | "delivery";
 
 export type UserProfile = {
   uid: string;
@@ -30,8 +30,8 @@ export type OrderStatus =
   | "OUT_FOR_DELIVERY"
   | "DELIVERED";
 
-export type PaymentMethod = "razorpay" | "cod" | "wallet";
-export type PaymentStatus = "pending" | "paid" | "failed" | "cod";
+export type PaymentMethod = "cod";
+export type PaymentStatus = "cod";
 
 export type OrderItem = {
   productId: string;
@@ -58,7 +58,6 @@ export type Order = {
   otp: string;
   paymentMethod: PaymentMethod;
   paymentStatus: PaymentStatus;
-  razorpayPaymentId?: string;
   etaMinutes?: number;
   createdAt?: unknown;
   updatedAt?: unknown;

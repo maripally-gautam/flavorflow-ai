@@ -1,7 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { AppShell } from "@/components/AppShell";
 import { ProductCard } from "@/components/ProductCard";
-import { products as fallbackProducts } from "@/lib/mock-data";
 import { Search as SearchIcon, X, Sparkles, TrendingUp } from "lucide-react";
 import { useState } from "react";
 import { useRouter } from "@tanstack/react-router";
@@ -20,8 +19,7 @@ function Search() {
   const [q, setQ] = useState("");
   const router = useRouter();
   const { products } = useProducts();
-  const liveProducts = products.length ? products : fallbackProducts;
-  const results = q ? liveProducts.filter((p) => {
+  const results = q ? products.filter((p) => {
     const text = `${p.name} ${p.vendor} ${p.description} ${p.tags.join(" ")}`.toLowerCase();
     const words = q.toLowerCase().split(/\s+/).filter((word) => word.length > 2);
     return text.includes(q.toLowerCase()) || words.some((word) => text.includes(word));

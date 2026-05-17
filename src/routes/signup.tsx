@@ -3,7 +3,7 @@ import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { ChevronLeft, User, Store, Bike, Camera, CheckCircle2, Sparkles, FileCheck, Upload } from "lucide-react";
 import { useApp } from "@/lib/store";
-import { signInWithGoogle, signUpWithEmail } from "@/lib/services/auth";
+import { signInWithGoogle, updateUserProfile } from "@/lib/services/auth";
 import { uploadFile } from "@/lib/services/storage";
 import { verifyFssaiCertificate } from "@/lib/services/ai";
 import { toast } from "sonner";
@@ -12,16 +12,14 @@ export const Route = createFileRoute("/signup")({ component: Signup });
 
 const roles = [
   { id: "customer", label: "Customer", desc: "Order curries, kits & spices", icon: User, gradient: "bg-gradient-warm" },
-  { id: "vendor", label: "Vendor", desc: "Sell your food creations", icon: Store, gradient: "bg-gradient-sunset" },
+  { id: "admin", label: "Admin", desc: "Add food and manage orders", icon: Store, gradient: "bg-gradient-sunset" },
   { id: "delivery", label: "Delivery Partner", desc: "Earn on your schedule", icon: Bike, gradient: "bg-gradient-ai" },
 ] as const;
 
 function Signup() {
   const [step, setStep] = useState(1);
-  const [role, setRole] = useState<"customer" | "vendor" | "delivery">("customer");
+  const [role, setRole] = useState<"customer" | "vendor" | "admin" | "delivery">("customer");
   const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
   const [phone, setPhone] = useState("");
   const [city, setCity] = useState("");
   const [businessName, setBusinessName] = useState("");
@@ -32,10 +30,10 @@ function Signup() {
   const nav = useNavigate();
   const setUser = useApp((s) => s.setUser);
 
-  const totalSteps = role === "vendor" ? 5 : 4;
+  const totalSteps = role === "admin" || role === "vendor" ? 5 : 4;
 
   const next = () => {
-    if (step === 3 && role === "vendor" && !verified) {
+    if (step === 3 && (role === "admin" || role === "vendor") && !verified) {
       setVerifying(true);
       (async () => {
         try {
@@ -58,22 +56,21 @@ function Signup() {
     setStep((s) => s + 1);
   };
 
-  const finish = async () => {
-    try {
-      const profile = await signUpWithEmail({ email, password, name: name || "Guest", role, phone, city, businessName });
-      if (certificate && profile?.uid) await uploadFile(`fssai/${profile.uid}/${certificate.name}`, certificate);
-      setUser({ name: profile?.name ?? name ?? "Guest", role: profile?.role ?? role, avatar: profile?.avatar ?? "https://i.pravatar.cc/150?img=47" });
-      nav({ to: role === "vendor" ? "/vendor" : role === "delivery" ? "/delivery" : "/home" });
-    } catch (error) {
-      toast.error("Could not create account", { description: error instanceof Error ? error.message : "Check the required fields." });
-    }
-  };
-
   const finishWithGoogle = async () => {
     try {
       const profile = await signInWithGoogle(role);
-      setUser({ name: profile?.name ?? "Guest", role: profile?.role ?? role, avatar: profile?.avatar });
-      nav({ to: profile?.role === "vendor" ? "/vendor" : profile?.role === "delivery" ? "/delivery" : "/home" });
+      if (profile?.uid) {
+        await updateUserProfile(profile.uid, {
+          role,
+          name: name || profile.name,
+          phone,
+          city,
+          businessName,
+        });
+      }
+      if (certificate && profile?.uid) await uploadFile(`fssai/${profile.uid}/${certificate.name}`, certificate);
+      setUser({ name: name || profile?.name || "Guest", role, avatar: profile?.avatar });
+      nav({ to: role === "admin" || role === "vendor" ? "/vendor" : role === "delivery" ? "/delivery" : "/home" });
     } catch (error) {
       toast.error("Google signup failed", { description: error instanceof Error ? error.message : "Try again." });
     }
@@ -132,20 +129,16 @@ function Signup() {
                 <div className="mt-6 space-y-3">
                   <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Full name"
                     className="w-full px-4 py-3.5 rounded-2xl bg-card border border-border focus:border-primary outline-none" />
-                  <input value={email} onChange={(e) => setEmail(e.target.value)} type="email" placeholder="Email address"
-                    className="w-full px-4 py-3.5 rounded-2xl bg-card border border-border focus:border-primary outline-none" />
-                  <input value={password} onChange={(e) => setPassword(e.target.value)} type="password" placeholder="Password"
-                    className="w-full px-4 py-3.5 rounded-2xl bg-card border border-border focus:border-primary outline-none" />
                   <input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="Phone number" className="w-full px-4 py-3.5 rounded-2xl bg-card border border-border focus:border-primary outline-none" />
                   <input value={city} onChange={(e) => setCity(e.target.value)} placeholder="City" className="w-full px-4 py-3.5 rounded-2xl bg-card border border-border focus:border-primary outline-none" />
-                  {role === "vendor" && (
+                  {(role === "admin" || role === "vendor") && (
                     <input value={businessName} onChange={(e) => setBusinessName(e.target.value)} placeholder="Business name" className="w-full px-4 py-3.5 rounded-2xl bg-card border border-border focus:border-primary outline-none" />
                   )}
                 </div>
               </>
             )}
 
-            {step === 3 && role !== "vendor" && (
+            {step === 3 && role !== "vendor" && role !== "admin" && (
               <>
                 <h2 className="font-display font-extrabold text-3xl leading-tight">Add a profile photo</h2>
                 <p className="text-muted-foreground text-sm mt-2">So delivery partners recognize you.</p>
@@ -163,7 +156,7 @@ function Signup() {
               </>
             )}
 
-            {step === 3 && role === "vendor" && (
+            {step === 3 && (role === "admin" || role === "vendor") && (
               <>
                 <h2 className="font-display font-extrabold text-3xl leading-tight">FSSAI verification</h2>
                 <p className="text-muted-foreground text-sm mt-2">Upload your certificate. AI will verify in seconds.</p>
@@ -193,7 +186,7 @@ function Signup() {
               </>
             )}
 
-            {step === 4 && role === "vendor" && (
+            {step === 4 && (role === "admin" || role === "vendor") && (
               <>
                 <div className="grid place-items-center text-center mt-4">
                   <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ type: "spring" }}
@@ -209,10 +202,10 @@ function Signup() {
               </>
             )}
 
-            {((step === 4 && role !== "vendor") || (step === 5 && role === "vendor")) && (
+            {((step === 4 && role !== "vendor" && role !== "admin") || (step === 5 && (role === "vendor" || role === "admin"))) && (
               <>
                 <h2 className="font-display font-extrabold text-3xl leading-tight">Almost there</h2>
-                <p className="text-muted-foreground text-sm mt-2">Link your Google account or finish setup.</p>
+                <p className="text-muted-foreground text-sm mt-2">Link your Google account to finish setup.</p>
                 <button onClick={finishWithGoogle} className="mt-8 w-full flex items-center justify-center gap-3 py-4 bg-card border border-border rounded-2xl font-medium">
                   <svg className="w-5 h-5" viewBox="0 0 24 24"><path fill="#4285f4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34a853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84A11 11 0 0 0 12 23z"/><path fill="#fbbc04" d="M5.84 14.09A6.6 6.6 0 0 1 5.49 12c0-.73.13-1.44.35-2.09V7.07H2.18A11 11 0 0 0 1 12c0 1.77.42 3.45 1.18 4.93l3.66-2.84z"/><path fill="#ea4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84C6.71 7.31 9.14 5.38 12 5.38z"/></svg>
                   Continue with Google
@@ -226,9 +219,9 @@ function Signup() {
 
       <div className="fixed bottom-0 left-0 right-0 safe-bottom px-6 pt-4 bg-gradient-to-t from-background via-background to-transparent">
         <div className="mx-auto max-w-md">
-          {((step === 4 && role !== "vendor") || (step === 5 && role === "vendor")) ? (
-            <button onClick={finish} className="w-full bg-gradient-warm text-white font-semibold py-4 rounded-2xl shadow-glow active:scale-[0.98] transition">
-              Enter CurryFlow
+          {((step === 4 && role !== "vendor" && role !== "admin") || (step === 5 && (role === "vendor" || role === "admin"))) ? (
+            <button onClick={finishWithGoogle} className="w-full bg-gradient-warm text-white font-semibold py-4 rounded-2xl shadow-glow active:scale-[0.98] transition">
+              Continue with Google
             </button>
           ) : (
             <button onClick={next} disabled={verifying}

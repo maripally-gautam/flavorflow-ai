@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { AppShell } from "@/components/AppShell";
 import { ProductCard } from "@/components/ProductCard";
-import { categories, offers, vendors } from "@/lib/mock-data";
+import { categories, offers } from "@/lib/mock-data";
 import { useApp } from "@/lib/store";
 import { Bell, ChevronDown, MapPin, Search, ShoppingBag, Sparkles, Star, BadgeCheck } from "lucide-react";
 import { motion } from "framer-motion";
@@ -15,6 +15,8 @@ function Home() {
   const [cat, setCat] = useState("all");
   const { products, loading } = useProducts();
   const cartCount = cart.reduce((s, c) => s + c.qty, 0);
+  const kitchens = Array.from(new Map(products.map((p) => [p.vendorId, { id: p.vendorId, name: p.vendor, rating: p.rating, image: p.image }])).values())
+    .map((kitchen) => ({ ...kitchen, items: products.filter((p) => p.vendorId === kitchen.id).length }));
 
   const filtered = cat === "all" ? products : products.filter((p) =>
     cat === "veg" ? p.veg :
@@ -126,13 +128,13 @@ function Home() {
       {/* Vendors */}
       <Section title="Popular kitchens" subtitle="AI-verified neighborhood chefs">
         <div className="px-5 space-y-3">
-          {vendors.map((v) => (
+          {kitchens.map((v) => (
             <div key={v.id} className="flex items-center gap-3 p-3 rounded-2xl bg-card border border-border shadow-card">
               <img src={v.image} alt={v.name} className="w-14 h-14 rounded-xl object-cover" />
               <div className="flex-1">
                 <div className="flex items-center gap-1.5">
                   <span className="font-semibold text-sm">{v.name}</span>
-                  {v.verified && <BadgeCheck className="w-4 h-4 text-ai" />}
+                  <BadgeCheck className="w-4 h-4 text-ai" />
                 </div>
                 <div className="text-xs text-muted-foreground">{v.items} items · 25-30 min</div>
               </div>
@@ -141,6 +143,7 @@ function Home() {
               </div>
             </div>
           ))}
+          {kitchens.length === 0 && <div className="text-sm text-muted-foreground">No admin food added yet.</div>}
         </div>
       </Section>
 

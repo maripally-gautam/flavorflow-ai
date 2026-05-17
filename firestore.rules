@@ -3,7 +3,7 @@ service cloud.firestore {
   match /databases/{database}/documents {
     function signedIn() { return request.auth != null; }
     function userDoc() { return get(/databases/$(database)/documents/users/$(request.auth.uid)); }
-    function role() { return signedIn() && userDoc().data.role; }
+    function role() { return signedIn() ? userDoc().data.role : null; }
 
     match /users/{userId} {
       allow read, update: if signedIn() && request.auth.uid == userId;
@@ -21,8 +21,8 @@ service cloud.firestore {
 
     match /products/{productId} {
       allow read: if true;
-      allow create: if signedIn() && role() == "vendor" && request.resource.data.vendorId == request.auth.uid;
-      allow update, delete: if signedIn() && role() == "vendor" && resource.data.vendorId == request.auth.uid;
+      allow create: if signedIn() && (role() == "vendor" || role() == "admin") && request.resource.data.vendorId == request.auth.uid;
+      allow update, delete: if signedIn() && (role() == "vendor" || role() == "admin") && resource.data.vendorId == request.auth.uid;
     }
 
     match /orders/{orderId} {

@@ -5,14 +5,12 @@ import {
   getDoc,
   limit,
   onSnapshot,
-  orderBy,
   query,
   serverTimestamp,
   updateDoc,
   where,
 } from "firebase/firestore";
 import { firestore } from "@/lib/firebase";
-import { mockOrders } from "@/lib/mock-data";
 import type { Order, OrderStatus, PaymentMethod, PaymentStatus } from "@/lib/types";
 import type { Product } from "@/lib/mock-data";
 
@@ -26,77 +24,56 @@ const statusRank: Record<OrderStatus, number> = {
   DELIVERED: 4,
 };
 
-function demoOrder(o: (typeof mockOrders)[number]): Order {
-  const status: OrderStatus = o.status === "delivered" ? "DELIVERED" : "OUT_FOR_DELIVERY";
-  return {
-    id: o.id,
-    customerId: "demo-customer",
-    vendorId: o.vendor === "Spice Route Kitchen" ? "v1" : "v2",
-    vendor: o.vendor,
-    status,
-    items: o.items.map((i) => ({ productId: i.name, name: i.name, qty: i.qty, price: i.price })),
-    subtotal: o.total,
-    deliveryFee: 0,
-    taxes: 0,
-    total: o.total,
-    address: "302, Indiranagar 6th Main, Bengaluru",
-    otp: "otp" in o ? o.otp : "1234",
-    paymentMethod: "cod",
-    paymentStatus: "cod",
-    etaMinutes: "eta" in o ? o.eta : 0,
-  };
-}
-
 export function orderStep(status: OrderStatus) {
   return statusRank[status] ?? 0;
 }
 
 export function listenCustomerOrders(customerId: string | undefined, cb: (orders: Order[]) => void) {
   if (!firestore || !customerId) {
-    cb(mockOrders.map(demoOrder));
+    cb([]);
     return () => undefined;
   }
   return onSnapshot(
-    query(collection(firestore, "orders"), where("customerId", "==", customerId), orderBy("createdAt", "desc")),
+    query(collection(firestore, "orders"), where("customerId", "==", customerId)),
     (snap) => cb(snap.docs.map((d) => ({ id: d.id, ...d.data() }) as Order)),
   );
 }
 
 export function listenVendorOrders(vendorId: string | undefined, cb: (orders: Order[]) => void) {
   if (!firestore || !vendorId) {
-    cb(mockOrders.map(demoOrder).filter((o) => o.vendorId === "v1"));
+    cb([]);
     return () => undefined;
   }
   return onSnapshot(
-    query(collection(firestore, "orders"), where("vendorId", "==", vendorId), orderBy("createdAt", "desc")),
+    query(collection(firestore, "orders"), where("vendorId", "==", vendorId)),
     (snap) => cb(snap.docs.map((d) => ({ id: d.id, ...d.data() }) as Order)),
   );
 }
 
 export function listenAvailableDeliveryOrders(cb: (orders: Order[]) => void) {
   if (!firestore) {
-    cb(mockOrders.map(demoOrder).filter((o) => o.status === "ACCEPTED" || o.status === "PLACED"));
+    cb([]);
     return () => undefined;
   }
   return onSnapshot(
-    query(collection(firestore, "orders"), where("status", "in", ["ACCEPTED", "PLACED"]), limit(20)),
+    query(collection(firestore, "orders"), where("status", "in", ["PLACED", "ACCEPTED", "PICKED_UP", "OUT_FOR_DELIVERY"]), limit(30)),
     (snap) => cb(snap.docs.map((d) => ({ id: d.id, ...d.data() }) as Order)),
   );
 }
 
 export function listenOrder(id: string, cb: (order: Order | null) => void) {
   if (!firestore) {
-    cb(mockOrders.map(demoOrder).find((o) => o.id === id) ?? null);
+    cb(null);
     return () => undefined;
   }
   return onSnapshot(doc(firestore, "orders", id), (snap) => cb(snap.exists() ? ({ id: snap.id, ...snap.data() } as Order) : null));
 }
 
 export async function getLatestOrder(customerId: string | undefined) {
-  if (!firestore || !customerId) return demoOrder(mockOrders[0]);
+  if (!firestore || !customerId) return null;
   return new Promise<Order | null>((resolve) => {
     const unsubscribe = onSnapshot(
-      query(collection(firestore, "orders"), where("customerId", "==", customerId), orderBy("createdAt", "desc"), limit(1)),
+      query(collection(firestore, "orders"), where("customerId", "==", customerId), limit(1)),
       (snap) => {
         unsubscribe();
         resolve(snap.docs[0] ? ({ id: snap.docs[0].id, ...snap.docs[0].data() } as Order) : null);
@@ -116,7 +93,6 @@ export async function createOrder(input: {
   total: number;
   paymentMethod: PaymentMethod;
   paymentStatus?: PaymentStatus;
-  razorpayPaymentId?: string;
 }) {
   if (!input.cart.length) throw new Error("Your cart is empty.");
   const vendorId = input.cart[0].product.vendorId;
@@ -144,8 +120,7 @@ export async function createOrder(input: {
     address: input.address,
     otp,
     paymentMethod: input.paymentMethod,
-    paymentStatus: input.paymentStatus ?? (input.paymentMethod === "cod" ? "cod" : "pending"),
-    razorpayPaymentId: input.razorpayPaymentId,
+    paymentStatus: "cod" as PaymentStatus,
     etaMinutes: 30,
     deliveryPartnerId: null,
     createdAt: serverTimestamp(),
@@ -171,7 +146,7 @@ export async function updateOrderStatus(id: string, status: OrderStatus, extra: 
 }
 
 export async function acceptDeliveryOrder(orderId: string, deliveryPartnerId: string) {
-  return updateOrderStatus(orderId, "PICKED_UP", { deliveryPartnerId });
+  return updateOrderStatus(orderId, "ACCEPTED", { deliveryPartnerId });
 }
 
 export async function verifyDeliveryOtp(orderId: string, otp: string) {

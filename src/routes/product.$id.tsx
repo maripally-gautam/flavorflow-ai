@@ -1,5 +1,4 @@
 import { createFileRoute, useParams, Link } from "@tanstack/react-router";
-import { products as fallbackProducts } from "@/lib/mock-data";
 import { Heart, Share2, Star, Clock, Flame, Minus, Plus, Sparkles, ChevronLeft, BadgeCheck } from "lucide-react";
 import { useApp } from "@/lib/store";
 import { toast } from "sonner";
@@ -11,14 +10,15 @@ export const Route = createFileRoute("/product/$id")({ component: ProductDetail 
 
 function ProductDetail() {
   const { id } = useParams({ from: "/product/$id" });
-  const { products } = useProducts();
-  const product = (products.length ? products : fallbackProducts).find((p) => p.id === id);
+  const { products, loading } = useProducts();
+  const product = products.find((p) => p.id === id);
   const { addToCart, cart, setQty } = useApp();
   const router = useRouter();
   const [fav, setFav] = useState(false);
   const inCart = cart.find((c) => c.product.id === id);
 
-  if (!product) return <div className="p-10 text-center">Not found</div>;
+  if (loading) return <div className="p-10 text-center">Loading food...</div>;
+  if (!product) return <div className="p-10 text-center">Food not found. Add it from the admin dashboard first.</div>;
 
   const handleAdd = () => {
     const r = addToCart(product);

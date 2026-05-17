@@ -1,15 +1,13 @@
 import {
-  createUserWithEmailAndPassword,
   onAuthStateChanged,
   setPersistence,
   browserLocalPersistence,
-  signInWithEmailAndPassword,
   signInWithPopup,
   signOut,
   type User,
 } from "firebase/auth";
 import { doc, getDoc, serverTimestamp, setDoc, updateDoc } from "firebase/firestore";
-import { firebaseAuth, firestore, googleProvider, isFirebaseConfigured, requireFirebase } from "@/lib/firebase";
+import { firebaseAuth, firestore, googleProvider, requireFirebase } from "@/lib/firebase";
 import type { UserProfile, UserRole } from "@/lib/types";
 
 const demoProfiles: Record<string, UserProfile> = {};
@@ -44,38 +42,6 @@ export async function upsertUserProfile(uid: string, profile: Partial<UserProfil
   };
   await setDoc(ref, data, { merge: true });
   return getUserProfile(uid);
-}
-
-export async function signUpWithEmail(input: {
-  email: string;
-  password: string;
-  name: string;
-  role: UserRole;
-  phone?: string;
-  city?: string;
-  businessName?: string;
-}) {
-  if (!isFirebaseConfigured) {
-    const uid = `demo-${Date.now()}`;
-    return upsertUserProfile(uid, { uid, email: input.email, name: input.name, role: input.role });
-  }
-  const { auth } = requireFirebase();
-  const result = await createUserWithEmailAndPassword(auth, input.email, input.password);
-  return upsertUserProfile(result.user.uid, {
-    email: input.email,
-    name: input.name,
-    role: input.role,
-    phone: input.phone,
-    city: input.city,
-    businessName: input.businessName,
-    avatar: result.user.photoURL ?? undefined,
-  });
-}
-
-export async function signInWithEmail(email: string, password: string) {
-  const { auth } = requireFirebase();
-  const result = await signInWithEmailAndPassword(auth, email, password);
-  return getUserProfile(result.user.uid);
 }
 
 export async function signInWithGoogle(role: UserRole = "customer") {

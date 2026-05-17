@@ -1,14 +1,13 @@
 # CurryFlow Backend Setup
 
 1. Create a Firebase project named `curryflow` or `flavorflow-ai`.
-2. Enable Firebase Authentication providers: Email/Password and Google.
+2. Enable Firebase Authentication provider: Google.
 3. Enable Firestore Database in production mode, then publish `firestore.rules`.
 4. Enable Firebase Storage, then publish `storage.rules`.
 5. Enable Cloud Messaging. Copy the Web Push certificate key into `VITE_FIREBASE_VAPID_KEY`.
 6. Create a Firebase Web App and copy its config into `.env.local` using `.env.example`.
-7. Get a Gemini key from Google AI Studio and set `VITE_GEMINI_API_KEY`.
-8. Create a Razorpay test account and set `VITE_RAZORPAY_KEY_ID`.
-9. No Render/Express backend is required for the MVP. The app uses Firebase client SDKs and intent-based Gemini calls.
+7. Get a Gemini key from Google AI Studio and set `VITE_GEMINI_API_KEY` only if you want to demo AI later.
+8. No Render/Express backend is required for the evaluation workflow. The app uses Firebase client SDKs.
 
 ## Commands
 
@@ -38,6 +37,6 @@ npx cap open android
 
 ## Free Tier Notes
 
-- Firestore, Auth, Storage, FCM, Gemini, and Razorpay test mode all work on free/test tiers for hackathon traffic.
+- Firestore, Auth, Storage, FCM, and Gemini all work on free/test tiers for hackathon traffic.
 - Client-side Gemini is acceptable for a hackathon demo but exposes the key. Move Gemini calls to Cloud Functions before production.
-- Razorpay test mode records test payments only. No subscriptions, refunds, or settlements are implemented.
+- Payments are disabled for evaluation. Orders are placed directly, tracked live, and completed by OTP.

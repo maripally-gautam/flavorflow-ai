@@ -1,18 +1,18 @@
 import { createFileRoute, Link, useParams } from "@tanstack/react-router";
 import { PageHeader } from "@/components/PageHeader";
 import { motion } from "framer-motion";
-import { CheckCircle2, Phone, MessageCircle, Bike, Package, Utensils, MapPin, ChefHat } from "lucide-react";
+import { CheckCircle2, Bike, Package, Utensils, MapPin, ChefHat } from "lucide-react";
 import { useOrder } from "@/hooks/use-live-data";
 import { orderStep } from "@/lib/services/orders";
 
 export const Route = createFileRoute("/track/$id")({ component: Track });
 
 const stages = [
-  { id: 0, label: "Order placed", time: "12:42", icon: CheckCircle2 },
-  { id: 1, label: "Accepted by chef", time: "12:43", icon: ChefHat },
-  { id: 2, label: "Picked up", time: "12:58", icon: Package },
-  { id: 3, label: "Out for delivery", time: "1:02", icon: Bike },
-  { id: 4, label: "Delivered", time: "—", icon: Utensils },
+  { id: 0, label: "Order placed", icon: CheckCircle2 },
+  { id: 1, label: "Delivery accepted", icon: ChefHat },
+  { id: 2, label: "Picked up", icon: Package },
+  { id: 3, label: "Out for delivery", icon: Bike },
+  { id: 4, label: "Delivered", icon: Utensils },
 ];
 
 function Track() {
@@ -25,24 +25,24 @@ function Track() {
       <PageHeader title={`Order ${id}`} subtitle="Live tracking" />
 
       <div className="p-5">
-        {/* ETA Hero */}
         <div className="p-5 rounded-3xl bg-gradient-warm text-white shadow-glow relative overflow-hidden">
           <div className="absolute -right-8 -top-8 w-32 h-32 rounded-full bg-white/10" />
           <div className="absolute -left-6 -bottom-6 w-24 h-24 rounded-full bg-white/10" />
           <div className="relative">
-            <div className="text-xs font-medium opacity-90">Arriving in</div>
-            <div className="font-display font-extrabold text-5xl mt-1">{step >= 4 ? "Done" : `${Math.max(8 - step * 2, 2)} min`}</div>
-            <div className="text-sm opacity-90 mt-1 flex items-center gap-1"><MapPin className="w-3.5 h-3.5" />{order?.address ?? "302, Indiranagar 6th Main"}</div>
+            <div className="text-xs font-medium opacity-90">Status</div>
+            <div className="font-display font-extrabold text-4xl mt-1">{order ? order.status.replaceAll("_", " ") : "Loading"}</div>
+            <div className="text-sm opacity-90 mt-1 flex items-center gap-1">
+              <MapPin className="w-3.5 h-3.5" />{order?.address ?? "Waiting for order"}
+            </div>
           </div>
         </div>
 
-        {/* Timeline */}
         <div className="mt-6 p-5 rounded-2xl bg-card border border-border shadow-card">
           <h3 className="font-display font-bold mb-4">Order status</h3>
           <ol className="relative">
             {stages.map((s, i) => {
-              const active = i <= step;
-              const current = i === step;
+              const active = order ? i <= step : false;
+              const current = order ? i === step : false;
               const Icon = s.icon;
               return (
                 <li key={s.id} className="relative flex gap-4 pb-5 last:pb-0">
@@ -59,7 +59,7 @@ function Track() {
                   </motion.div>
                   <div className="flex-1 pt-1.5">
                     <div className={`font-semibold text-sm ${active ? "" : "text-muted-foreground"}`}>{s.label}</div>
-                    <div className="text-xs text-muted-foreground">{active ? s.time : "Pending"}</div>
+                    <div className="text-xs text-muted-foreground">{active ? "Updated live" : "Pending"}</div>
                   </div>
                 </li>
               );
@@ -67,22 +67,13 @@ function Track() {
           </ol>
         </div>
 
-        {/* Delivery partner */}
-        {step >= 2 && step < 4 && (
+        {order && step >= 1 && step < 4 && (
           <div className="mt-4 p-4 rounded-2xl bg-card border border-border shadow-card">
-            <div className="flex items-center gap-3">
-              <img src="https://i.pravatar.cc/100?img=12" className="w-12 h-12 rounded-full object-cover" alt="" />
-              <div className="flex-1">
-                <div className="font-semibold text-sm">Rahul S.</div>
-                <div className="text-xs text-muted-foreground">⭐ 4.9 · DL 8C 4231</div>
-              </div>
-              <button className="w-10 h-10 grid place-items-center rounded-xl bg-mint/15 text-mint"><Phone className="w-4 h-4" /></button>
-              <button className="w-10 h-10 grid place-items-center rounded-xl bg-accent"><MessageCircle className="w-4 h-4" /></button>
-            </div>
+            <div className="font-semibold text-sm">Delivery partner is handling your order</div>
             <div className="mt-4 p-3 rounded-xl bg-gradient-ai text-white">
-              <div className="text-xs opacity-90">Share OTP with delivery partner</div>
+              <div className="text-xs opacity-90">Share OTP only when food is handed to you</div>
               <div className="flex gap-2 mt-1.5">
-                {(order?.otp ?? "4827").split("").map((d, i) => (
+                {order.otp.split("").map((d, i) => (
                   <div key={i} className="w-10 h-12 rounded-lg bg-white/20 backdrop-blur grid place-items-center font-bold text-lg">{d}</div>
                 ))}
               </div>
