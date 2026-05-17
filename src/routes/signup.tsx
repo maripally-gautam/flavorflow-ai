@@ -27,7 +27,7 @@ function Signup() {
   const nav = useNavigate();
   const setUser = useApp((state) => state.setUser);
   const setLocation = useApp((state) => state.setLocation);
-  const { profile, loading: authLoading } = useAuth();
+  const { profile, loading: authLoading, refreshProfile } = useAuth();
   const [role, setRole] = useState<UserRole | null>(null);
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
@@ -78,6 +78,7 @@ function Signup() {
       const resolvedRole = profile?.role ?? role;
       setUser({ name: profile?.name || name, role: resolvedRole, avatar: profile?.avatar });
       setLocation(profile?.location || location.trim());
+      if (profile) await refreshProfile(profile.uid);
       nav({ to: routeForRole(resolvedRole) });
     } catch (error) {
       toast.error("Google sign in failed", { description: error instanceof Error ? error.message : "Check Firebase auth setup." });

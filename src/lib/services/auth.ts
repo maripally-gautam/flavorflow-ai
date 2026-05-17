@@ -38,14 +38,20 @@ export function onAuthChanged(cb: (user: User | null) => void) {
 export async function getUserProfile(uid: string) {
   if (!firestore) return localProfiles[uid] ?? null;
   const snap = await getDoc(doc(firestore, "users", uid));
-  return snap.exists() ? ({ uid, ...snap.data() } as UserProfile) : null;
+  if (snap.exists()) return { uid, ...snap.data() } as UserProfile;
+  return localProfiles[uid] ?? null;
 }
 
 export async function upsertUserProfile(uid: string, profile: Partial<UserProfile>) {
   const cleanProfile = removeUndefined(profile);
+  const nextLocal = {
+    ...(localProfiles[uid] ?? { uid, name: "", role: "customer" }),
+    ...cleanProfile,
+    uid,
+  } as UserProfile;
+  localProfiles[uid] = nextLocal;
   if (!firestore) {
-    localProfiles[uid] = { ...(localProfiles[uid] ?? { uid, name: "", role: "customer" }), ...cleanProfile, uid } as UserProfile;
-    return localProfiles[uid];
+    return nextLocal;
   }
   const ref = doc(firestore, "users", uid);
   const existing = await getDoc(ref);

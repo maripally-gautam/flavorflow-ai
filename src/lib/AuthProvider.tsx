@@ -10,7 +10,7 @@ type AuthContextValue = {
   loading: boolean;
   profile: UserProfile | null;
   role: UserRole | null;
-  refreshProfile: () => Promise<void>;
+  refreshProfile: (uidOverride?: string) => Promise<void>;
 };
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -26,11 +26,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const setUser = useApp((s) => s.setUser);
 
-  const refreshProfile = async () => {
-    const uid = profile?.uid;
+  const refreshProfile = async (uidOverride?: string) => {
+    const uid = uidOverride ?? profile?.uid;
     if (!uid) return;
     const fresh = await getUserProfile(uid);
     setProfile(fresh);
+    setUser(fresh ? { name: fresh.name, role: fresh.role, avatar: fresh.avatar } : null);
   };
 
   useEffect(() => {

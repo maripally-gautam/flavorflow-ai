@@ -12,7 +12,7 @@ function Login() {
   const [loading, setLoading] = useState(false);
   const nav = useNavigate();
   const setUser = useApp((s) => s.setUser);
-  const { profile, loading: authLoading } = useAuth();
+  const { profile, loading: authLoading, refreshProfile } = useAuth();
 
   const routeForRole = (role?: string) => role === "vendor" || role === "admin" ? "/vendor" : role === "delivery" ? "/delivery" : "/home";
 
@@ -25,7 +25,10 @@ function Login() {
     setLoading(true);
     try {
       const profile = await signInWithGoogle();
-      if (profile) setUser({ name: profile.name, role: profile.role, avatar: profile.avatar });
+      if (profile) {
+        setUser({ name: profile.name, role: profile.role, avatar: profile.avatar });
+        await refreshProfile(profile.uid);
+      }
       nav({ to: routeForRole(profile?.role) });
     } catch (error) {
       toast.error("Google sign-in failed", { description: error instanceof Error ? error.message : "Try again." });
