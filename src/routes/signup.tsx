@@ -1,236 +1,175 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
-import { ChevronLeft, User, Store, Bike, Camera, CheckCircle2, Sparkles, FileCheck, Upload } from "lucide-react";
-import { useApp } from "@/lib/store";
-import { signInWithGoogle, updateUserProfile } from "@/lib/services/auth";
-import { uploadFile } from "@/lib/services/storage";
-import { verifyFssaiCertificate } from "@/lib/services/ai";
+import { Bike, CheckCircle2, ChevronLeft, FileCheck, Store, User } from "lucide-react";
+import { useMemo, useState } from "react";
 import { toast } from "sonner";
+import { useApp } from "@/lib/store";
+import { signInWithGoogle } from "@/lib/services/auth";
+import { verifyFssaiCertificate } from "@/lib/services/ai";
+import type { SignupCategory, UserRole } from "@/lib/types";
 
 export const Route = createFileRoute("/signup")({ component: Signup });
 
-const roles = [
-  { id: "customer", label: "Customer", desc: "Order curries, kits & spices", icon: User, gradient: "bg-gradient-warm" },
-  { id: "admin", label: "Admin", desc: "Add food and manage orders", icon: Store, gradient: "bg-gradient-sunset" },
-  { id: "delivery", label: "Delivery Partner", desc: "Earn on your schedule", icon: Bike, gradient: "bg-gradient-ai" },
+const roleOptions = [
+  { id: "vendor", label: "Vendor", detail: "Post food, trip kits, gym kits, and more.", icon: Store },
+  { id: "customer", label: "User", detail: "Order posted items and track delivery.", icon: User },
+  { id: "delivery", label: "Delivery Person", detail: "Accept paid orders and update delivery.", icon: Bike },
 ] as const;
 
+const categories: { id: SignupCategory; label: string }[] = [
+  { id: "food", label: "Food" },
+  { id: "trip-kit", label: "Trip kit" },
+  { id: "gym-kit", label: "Gym kit" },
+  { id: "other", label: "Other" },
+];
+
 function Signup() {
-  const [step, setStep] = useState(1);
-  const [role, setRole] = useState<"customer" | "vendor" | "admin" | "delivery">("customer");
+  const nav = useNavigate();
+  const setUser = useApp((state) => state.setUser);
+  const setLocation = useApp((state) => state.setLocation);
+  const [role, setRole] = useState<UserRole | null>(null);
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
-  const [city, setCity] = useState("");
+  const [location, setLocationValue] = useState("");
   const [businessName, setBusinessName] = useState("");
-  const [certificate, setCertificate] = useState<File | null>(null);
-  const [trustScore, setTrustScore] = useState(98);
-  const [verifying, setVerifying] = useState(false);
-  const [verified, setVerified] = useState(false);
-  const nav = useNavigate();
-  const setUser = useApp((s) => s.setUser);
+  const [category, setCategory] = useState<SignupCategory>("food");
+  const [license, setLicense] = useState<File | null>(null);
+  const [licenseVerified, setLicenseVerified] = useState(false);
+  const [busy, setBusy] = useState(false);
 
-  const totalSteps = role === "admin" || role === "vendor" ? 5 : 4;
+  const needsLicense = role === "vendor" && category === "food";
+  const detailsComplete = useMemo(() => {
+    const base = name.trim() && phone.trim() && location.trim();
+    if (role === "vendor") return Boolean(base && businessName.trim() && category);
+    return Boolean(base);
+  }, [businessName, category, location, name, phone, role]);
 
-  const next = () => {
-    if (step === 3 && (role === "admin" || role === "vendor") && !verified) {
-      setVerifying(true);
-      (async () => {
-        try {
-          if (certificate) {
-            const result = await verifyFssaiCertificate(certificate);
-            setTrustScore(result.trustScore ?? 82);
-          }
-          setVerified(true);
-          setStep(4);
-        } catch {
-          toast.error("AI verification needs review", { description: "You can continue and complete manual review later." });
-          setVerified(true);
-          setStep(4);
-        } finally {
-          setVerifying(false);
-        }
-      })();
+  const destination = role === "delivery" ? "/delivery" : role === "vendor" ? "/vendor" : "/home";
+
+  const completeSignup = async () => {
+    if (!role) return;
+    if (!detailsComplete) {
+      toast.error("Complete all required details");
       return;
     }
-    setStep((s) => s + 1);
+    if (needsLicense && !licenseVerified) {
+      toast.error("Verify the FSSAI license first");
+      return;
+    }
+
+    setBusy(true);
+    try {
+      const profile = await signInWithGoogle(role, {
+        name: name.trim(),
+        phone: phone.trim(),
+        location: location.trim(),
+        businessName: businessName.trim() || undefined,
+        category: role === "vendor" ? category : undefined,
+        fssaiVerified: needsLicense ? licenseVerified : undefined,
+      });
+      setUser({ name: profile?.name || name, role, avatar: profile?.avatar });
+      setLocation(location.trim());
+      nav({ to: destination });
+    } catch (error) {
+      toast.error("Google sign in failed", { description: error instanceof Error ? error.message : "Check Firebase auth setup." });
+    } finally {
+      setBusy(false);
+    }
   };
 
-  const finishWithGoogle = async () => {
+  const verifyLicense = async () => {
+    if (!license) {
+      toast.error("Upload the FSSAI license first");
+      return;
+    }
+    setBusy(true);
     try {
-      const profile = await signInWithGoogle(role);
-      if (profile?.uid) {
-        await updateUserProfile(profile.uid, {
-          role,
-          name: name || profile.name,
-          phone,
-          city,
-          businessName,
-        });
+      const result = await verifyFssaiCertificate(license);
+      if (result.status === "invalid" || Number(result.trustScore ?? 0) < 50) {
+        toast.error("License could not be verified", { description: result.reason ?? "Upload a clear FSSAI-approved license." });
+        return;
       }
-      if (certificate && profile?.uid) await uploadFile(`fssai/${profile.uid}/${certificate.name}`, certificate);
-      setUser({ name: name || profile?.name || "Guest", role, avatar: profile?.avatar });
-      nav({ to: role === "admin" || role === "vendor" ? "/vendor" : role === "delivery" ? "/delivery" : "/home" });
+      setLicenseVerified(true);
+      toast.success("FSSAI license verified by AI");
     } catch (error) {
-      toast.error("Google signup failed", { description: error instanceof Error ? error.message : "Try again." });
+      toast.error("AI verification failed", { description: error instanceof Error ? error.message : "Try another file." });
+    } finally {
+      setBusy(false);
     }
   };
 
   return (
     <div className="min-h-screen bg-background bg-mesh">
-      <div className="safe-top px-5 pt-3 pb-2 flex items-center gap-3">
-        <button onClick={() => step > 1 ? setStep(step - 1) : nav({ to: "/welcome" })} className="w-9 h-9 grid place-items-center rounded-xl bg-card border border-border">
-          <ChevronLeft className="w-5 h-5" />
+      <div className="safe-top mx-auto max-w-md px-5 pt-4">
+        <button onClick={() => (role ? setRole(null) : nav({ to: "/welcome" }))} className="grid h-10 w-10 place-items-center rounded-xl border border-border bg-card">
+          <ChevronLeft className="h-5 w-5" />
         </button>
-        <div className="flex-1 flex gap-1.5">
-          {Array.from({ length: totalSteps }).map((_, i) => (
-            <div key={i} className={`flex-1 h-1.5 rounded-full transition-all ${i < step ? "bg-gradient-warm" : "bg-border"}`} />
-          ))}
-        </div>
-        <span className="text-xs text-muted-foreground font-medium">{step}/{totalSteps}</span>
       </div>
 
-      <div className="px-6 pt-6 pb-32">
-        <AnimatePresence mode="wait">
-          <motion.div key={step}
-            initial={{ x: 30, opacity: 0 }} animate={{ x: 0, opacity: 1 }} exit={{ x: -30, opacity: 0 }}
-            transition={{ duration: 0.25 }}>
+      <main className="mx-auto max-w-md px-6 pb-24 pt-8">
+        {!role ? (
+          <>
+            <h1 className="font-display text-3xl font-extrabold">Create your account</h1>
+            <p className="mt-2 text-sm text-muted-foreground">Choose one role to continue.</p>
+            <div className="mt-8 space-y-3">
+              {roleOptions.map((option) => {
+                const Icon = option.icon;
+                return (
+                  <button key={option.id} onClick={() => setRole(option.id)} className="flex w-full items-center gap-4 rounded-2xl border border-border bg-card p-4 text-left shadow-card">
+                    <span className="grid h-12 w-12 place-items-center rounded-xl bg-primary text-primary-foreground">
+                      <Icon className="h-5 w-5" />
+                    </span>
+                    <span className="flex-1">
+                      <span className="block font-bold">{option.label}</span>
+                      <span className="text-xs text-muted-foreground">{option.detail}</span>
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </>
+        ) : (
+          <>
+            <h1 className="font-display text-3xl font-extrabold">
+              {role === "vendor" ? "Vendor sign up" : role === "delivery" ? "Delivery sign up" : "User sign up"}
+            </h1>
+            <div className="mt-6 space-y-3">
+              <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Name" className="w-full rounded-2xl border border-border bg-card px-4 py-3 outline-none focus:border-primary" />
+              <input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="Phone number" inputMode="tel" className="w-full rounded-2xl border border-border bg-card px-4 py-3 outline-none focus:border-primary" />
+              <input value={location} onChange={(e) => setLocationValue(e.target.value)} placeholder="Location" className="w-full rounded-2xl border border-border bg-card px-4 py-3 outline-none focus:border-primary" />
 
-            {step === 1 && (
-              <>
-                <h2 className="font-display font-extrabold text-3xl leading-tight">How will you<br />use CurryFlow?</h2>
-                <p className="text-muted-foreground text-sm mt-2">Pick the role that fits you best.</p>
-                <div className="mt-8 space-y-3">
-                  {roles.map((r) => {
-                    const Icon = r.icon;
-                    const active = role === r.id;
-                    return (
-                      <button key={r.id} onClick={() => setRole(r.id)}
-                        className={`w-full flex items-center gap-4 p-4 rounded-2xl border-2 transition-all text-left ${active ? "border-primary bg-primary/5 shadow-card" : "border-border bg-card"}`}>
-                        <div className={`w-12 h-12 rounded-xl ${r.gradient} grid place-items-center text-white shadow-card`}>
-                          <Icon className="w-5 h-5" />
-                        </div>
-                        <div className="flex-1">
-                          <div className="font-semibold">{r.label}</div>
-                          <div className="text-xs text-muted-foreground">{r.desc}</div>
-                        </div>
-                        {active && <CheckCircle2 className="w-5 h-5 text-primary" />}
-                      </button>
-                    );
-                  })}
-                </div>
-              </>
-            )}
+              {role === "vendor" && (
+                <>
+                  <input value={businessName} onChange={(e) => setBusinessName(e.target.value)} placeholder="Business name" className="w-full rounded-2xl border border-border bg-card px-4 py-3 outline-none focus:border-primary" />
+                  <select value={category} onChange={(e) => { setCategory(e.target.value as SignupCategory); setLicenseVerified(false); }} className="w-full rounded-2xl border border-border bg-card px-4 py-3 outline-none focus:border-primary">
+                    {categories.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}
+                  </select>
+                </>
+              )}
+            </div>
 
-            {step === 2 && (
-              <>
-                <h2 className="font-display font-extrabold text-3xl leading-tight">Tell us about yourself</h2>
-                <p className="text-muted-foreground text-sm mt-2">We'll personalize your experience.</p>
-                <div className="mt-6 space-y-3">
-                  <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Full name"
-                    className="w-full px-4 py-3.5 rounded-2xl bg-card border border-border focus:border-primary outline-none" />
-                  <input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="Phone number" className="w-full px-4 py-3.5 rounded-2xl bg-card border border-border focus:border-primary outline-none" />
-                  <input value={city} onChange={(e) => setCity(e.target.value)} placeholder="City" className="w-full px-4 py-3.5 rounded-2xl bg-card border border-border focus:border-primary outline-none" />
-                  {(role === "admin" || role === "vendor") && (
-                    <input value={businessName} onChange={(e) => setBusinessName(e.target.value)} placeholder="Business name" className="w-full px-4 py-3.5 rounded-2xl bg-card border border-border focus:border-primary outline-none" />
-                  )}
-                </div>
-              </>
-            )}
-
-            {step === 3 && role !== "vendor" && role !== "admin" && (
-              <>
-                <h2 className="font-display font-extrabold text-3xl leading-tight">Add a profile photo</h2>
-                <p className="text-muted-foreground text-sm mt-2">So delivery partners recognize you.</p>
-                <div className="mt-10 grid place-items-center">
-                  <div className="relative">
-                    <div className="w-40 h-40 rounded-full bg-gradient-warm grid place-items-center text-white shadow-glow">
-                      <Camera className="w-12 h-12" />
-                    </div>
-                    <button className="absolute bottom-2 right-2 w-12 h-12 grid place-items-center rounded-full bg-card border-4 border-background shadow-card">
-                      <Upload className="w-4 h-4" />
-                    </button>
-                  </div>
-                  <p className="mt-6 text-sm text-muted-foreground">Tap to upload — optional</p>
-                </div>
-              </>
-            )}
-
-            {step === 3 && (role === "admin" || role === "vendor") && (
-              <>
-                <h2 className="font-display font-extrabold text-3xl leading-tight">FSSAI verification</h2>
-                <p className="text-muted-foreground text-sm mt-2">Upload your certificate. AI will verify in seconds.</p>
-                <div className="mt-8 p-6 rounded-2xl border-2 border-dashed border-border bg-card grid place-items-center text-center">
-                  <FileCheck className="w-10 h-10 text-primary mb-3" />
-                  <div className="font-semibold">Drop FSSAI certificate</div>
-                  <div className="text-xs text-muted-foreground mt-1">PDF or image · up to 5 MB</div>
-                  <label className="mt-4 px-5 py-2 text-sm font-semibold bg-primary text-primary-foreground rounded-xl">
-                    Choose file
-                    <input type="file" accept="image/*,application/pdf" className="hidden" onChange={(e) => setCertificate(e.target.files?.[0] ?? null)} />
-                  </label>
-                  {certificate && <div className="mt-3 text-xs text-muted-foreground">{certificate.name}</div>}
-                </div>
-                {verifying && (
-                  <div className="mt-6 p-5 rounded-2xl bg-gradient-ai text-white">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-full bg-white/20 grid place-items-center pulse-ring">
-                        <Sparkles className="w-5 h-5 animate-pulse" />
-                      </div>
-                      <div>
-                        <div className="font-semibold text-sm">AI verifying your document</div>
-                        <div className="text-xs text-white/80">Scanning, validating, cross-checking…</div>
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </>
-            )}
-
-            {step === 4 && (role === "admin" || role === "vendor") && (
-              <>
-                <div className="grid place-items-center text-center mt-4">
-                  <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ type: "spring" }}
-                    className="w-24 h-24 rounded-full bg-gradient-ai grid place-items-center text-white shadow-ai mb-5">
-                    <CheckCircle2 className="w-12 h-12" />
-                  </motion.div>
-                  <h2 className="font-display font-extrabold text-3xl">AI Verified Vendor</h2>
-                  <p className="text-muted-foreground text-sm mt-2 max-w-xs">Your FSSAI cert checked out. You'll now display a verified badge across CurryFlow.</p>
-                  <div className="mt-5 inline-flex items-center gap-2 px-4 py-2 rounded-full bg-ai/10 text-ai font-semibold text-sm">
-                    <Sparkles className="w-4 h-4" /> Trust score · {trustScore}%
+            {needsLicense && (
+              <section className="mt-5 rounded-2xl border border-dashed border-border bg-card p-4">
+                <div className="flex items-center gap-3">
+                  <FileCheck className="h-5 w-5 text-primary" />
+                  <div>
+                    <h2 className="font-bold">FSSAI-approved food license</h2>
+                    <p className="text-xs text-muted-foreground">Food vendors must verify the license with AI.</p>
                   </div>
                 </div>
-              </>
-            )}
-
-            {((step === 4 && role !== "vendor" && role !== "admin") || (step === 5 && (role === "vendor" || role === "admin"))) && (
-              <>
-                <h2 className="font-display font-extrabold text-3xl leading-tight">Almost there</h2>
-                <p className="text-muted-foreground text-sm mt-2">Link your Google account to finish setup.</p>
-                <button onClick={finishWithGoogle} className="mt-8 w-full flex items-center justify-center gap-3 py-4 bg-card border border-border rounded-2xl font-medium">
-                  <svg className="w-5 h-5" viewBox="0 0 24 24"><path fill="#4285f4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34a853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84A11 11 0 0 0 12 23z"/><path fill="#fbbc04" d="M5.84 14.09A6.6 6.6 0 0 1 5.49 12c0-.73.13-1.44.35-2.09V7.07H2.18A11 11 0 0 0 1 12c0 1.77.42 3.45 1.18 4.93l3.66-2.84z"/><path fill="#ea4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84C6.71 7.31 9.14 5.38 12 5.38z"/></svg>
-                  Continue with Google
+                <input type="file" accept="image/*,application/pdf" onChange={(e) => { setLicense(e.target.files?.[0] ?? null); setLicenseVerified(false); }} className="mt-4 block w-full text-sm" />
+                <button onClick={verifyLicense} disabled={busy || licenseVerified} className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl bg-foreground py-3 font-semibold text-background disabled:opacity-60">
+                  {licenseVerified && <CheckCircle2 className="h-4 w-4" />}
+                  {licenseVerified ? "Verified" : busy ? "Verifying..." : "Verify with AI"}
                 </button>
-              </>
+              </section>
             )}
 
-          </motion.div>
-        </AnimatePresence>
-      </div>
-
-      <div className="fixed bottom-0 left-0 right-0 safe-bottom px-6 pt-4 bg-gradient-to-t from-background via-background to-transparent">
-        <div className="mx-auto max-w-md">
-          {((step === 4 && role !== "vendor" && role !== "admin") || (step === 5 && (role === "vendor" || role === "admin"))) ? (
-            <button onClick={finishWithGoogle} className="w-full bg-gradient-warm text-white font-semibold py-4 rounded-2xl shadow-glow active:scale-[0.98] transition">
-              Continue with Google
+            <button onClick={completeSignup} disabled={busy || !detailsComplete || (needsLicense && !licenseVerified)} className="mt-6 w-full rounded-2xl bg-gradient-warm py-4 font-bold text-white shadow-glow disabled:opacity-50">
+              {busy ? "Please wait..." : role === "vendor" ? "Sign in vendor with Google" : "Sign in with Google"}
             </button>
-          ) : (
-            <button onClick={next} disabled={verifying}
-              className="w-full bg-gradient-warm text-white font-semibold py-4 rounded-2xl shadow-glow active:scale-[0.98] transition disabled:opacity-60">
-              {verifying ? "Verifying…" : "Continue"}
-            </button>
-          )}
-        </div>
-      </div>
+          </>
+        )}
+      </main>
     </div>
   );
 }

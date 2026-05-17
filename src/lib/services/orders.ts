@@ -11,17 +11,17 @@ import {
   where,
 } from "firebase/firestore";
 import { firestore } from "@/lib/firebase";
-import type { Order, OrderStatus, PaymentMethod, PaymentStatus } from "@/lib/types";
-import type { Product } from "@/lib/mock-data";
+import type { LiveProduct, Order, OrderStatus } from "@/lib/types";
 
-type CartItem = { product: Product; qty: number };
+type CartItem = { product: LiveProduct; qty: number };
 
 const statusRank: Record<OrderStatus, number> = {
-  PLACED: 0,
+  ORDERED: 0,
   ACCEPTED: 1,
-  PICKED_UP: 2,
-  OUT_FOR_DELIVERY: 3,
-  DELIVERED: 4,
+  TAKEN: 2,
+  ON_THE_WAY: 3,
+  REACHED: 4,
+  FINISHED: 5,
 };
 
 export function orderStep(status: OrderStatus) {
@@ -56,7 +56,7 @@ export function listenAvailableDeliveryOrders(cb: (orders: Order[]) => void) {
     return () => undefined;
   }
   return onSnapshot(
-    query(collection(firestore, "orders"), where("status", "in", ["PLACED", "ACCEPTED", "PICKED_UP", "OUT_FOR_DELIVERY"]), limit(30)),
+    query(collection(firestore, "orders"), where("status", "in", ["ORDERED", "ACCEPTED", "TAKEN", "ON_THE_WAY", "REACHED"]), limit(50)),
     (snap) => cb(snap.docs.map((d) => ({ id: d.id, ...d.data() }) as Order)),
   );
 }
@@ -66,20 +66,9 @@ export function listenOrder(id: string, cb: (order: Order | null) => void) {
     cb(null);
     return () => undefined;
   }
-  return onSnapshot(doc(firestore, "orders", id), (snap) => cb(snap.exists() ? ({ id: snap.id, ...snap.data() } as Order) : null));
-}
-
-export async function getLatestOrder(customerId: string | undefined) {
-  if (!firestore || !customerId) return null;
-  return new Promise<Order | null>((resolve) => {
-    const unsubscribe = onSnapshot(
-      query(collection(firestore, "orders"), where("customerId", "==", customerId), limit(1)),
-      (snap) => {
-        unsubscribe();
-        resolve(snap.docs[0] ? ({ id: snap.docs[0].id, ...snap.docs[0].data() } as Order) : null);
-      },
-    );
-  });
+  return onSnapshot(doc(firestore, "orders", id), (snap) =>
+    cb(snap.exists() ? ({ id: snap.id, ...snap.data() } as Order) : null),
+  );
 }
 
 export async function createOrder(input: {
@@ -87,25 +76,25 @@ export async function createOrder(input: {
   customerName?: string;
   cart: CartItem[];
   address: string;
+  timeSlot: string;
   subtotal: number;
-  deliveryFee: number;
-  taxes: number;
   total: number;
-  paymentMethod: PaymentMethod;
-  paymentStatus?: PaymentStatus;
 }) {
   if (!input.cart.length) throw new Error("Your cart is empty.");
+  if (!input.timeSlot) throw new Error("Select a delivery time slot.");
+
   const vendorId = input.cart[0].product.vendorId;
   if (input.cart.some((item) => item.product.vendorId !== vendorId)) {
-    throw new Error("Only one vendor is allowed per order.");
+    throw new Error("Cart can contain items from only one admin at a time.");
   }
+
   const otp = Math.floor(1000 + Math.random() * 9000).toString();
   const order = {
     customerId: input.customerId,
     customerName: input.customerName,
     vendorId,
     vendor: input.cart[0].product.vendor,
-    status: "PLACED" as OrderStatus,
+    status: "ORDERED" as OrderStatus,
     items: input.cart.map(({ product, qty }) => ({
       productId: product.id,
       name: product.name,
@@ -114,29 +103,18 @@ export async function createOrder(input: {
       image: product.image,
     })),
     subtotal: input.subtotal,
-    deliveryFee: input.deliveryFee,
-    taxes: input.taxes,
     total: input.total,
     address: input.address,
+    timeSlot: input.timeSlot,
     otp,
-    paymentMethod: input.paymentMethod,
-    paymentStatus: "cod" as PaymentStatus,
-    etaMinutes: 30,
+    paymentStatus: "completed" as const,
     deliveryPartnerId: null,
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
   };
-  if (!firestore) return { id: `ORD${Math.floor(Math.random() * 9000) + 1000}`, ...order } as Order;
+
+  if (!firestore) return { id: `ORD${Date.now()}`, ...order } as Order;
   const ref = await addDoc(collection(firestore, "orders"), order);
-  await addDoc(collection(firestore, "notifications"), {
-    userId: input.customerId,
-    type: "order",
-    title: "Order placed",
-    body: `${order.vendor} received your order.`,
-    unread: true,
-    orderId: ref.id,
-    createdAt: serverTimestamp(),
-  });
   return { id: ref.id, ...order } as Order;
 }
 
@@ -145,15 +123,11 @@ export async function updateOrderStatus(id: string, status: OrderStatus, extra: 
   await updateDoc(doc(firestore, "orders", id), { status, ...extra, updatedAt: serverTimestamp() });
 }
 
-export async function acceptDeliveryOrder(orderId: string, deliveryPartnerId: string) {
-  return updateOrderStatus(orderId, "ACCEPTED", { deliveryPartnerId });
-}
-
 export async function verifyDeliveryOtp(orderId: string, otp: string) {
-  if (!firestore) return true;
+  if (!firestore) return otp.length === 4;
   const snap = await getDoc(doc(firestore, "orders", orderId));
   const order = snap.exists() ? (snap.data() as Order) : null;
   if (!order || order.otp !== otp) return false;
-  await updateOrderStatus(orderId, "DELIVERED");
+  await updateOrderStatus(orderId, "FINISHED");
   return true;
 }

@@ -1,29 +1,25 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { Minus, Plus, ShoppingBag, Trash2 } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
 import { PageHeader } from "@/components/PageHeader";
-import { useApp, cartTotal } from "@/lib/store";
-import { Minus, Plus, Trash2, Tag, ShoppingBag } from "lucide-react";
+import { cartTotal, useApp } from "@/lib/store";
 
 export const Route = createFileRoute("/cart")({ component: Cart });
 
 function Cart() {
   const { cart, setQty, removeFromCart } = useApp();
-  const subtotal = cartTotal(cart);
-  const delivery = subtotal > 0 ? (subtotal > 299 ? 0 : 29) : 0;
-  const taxes = Math.round(subtotal * 0.05);
-  const total = subtotal + delivery + taxes;
+  const total = cartTotal(cart);
 
   if (cart.length === 0) {
     return (
-      <AppShell>
-        <PageHeader title="Your cart" />
-        <div className="grid place-items-center py-24 text-center px-8">
-          <div className="w-20 h-20 rounded-3xl bg-accent grid place-items-center mb-4">
-            <ShoppingBag className="w-9 h-9 text-muted-foreground" />
+      <AppShell hideNav>
+        <PageHeader title="Cart" />
+        <div className="grid place-items-center px-8 py-24 text-center">
+          <div className="mb-4 grid h-20 w-20 place-items-center rounded-3xl bg-accent">
+            <ShoppingBag className="h-9 w-9 text-muted-foreground" />
           </div>
-          <h2 className="font-display font-bold text-xl">Your cart is empty</h2>
-          <p className="text-sm text-muted-foreground mt-1">Discover dishes and add favourites to get rolling.</p>
-          <Link to="/home" className="mt-6 px-6 py-3 bg-gradient-warm text-white font-semibold rounded-2xl shadow-glow">Browse menu</Link>
+          <h1 className="font-display text-xl font-bold">Your cart is empty</h1>
+          <Link to="/home" className="mt-6 rounded-2xl bg-gradient-warm px-6 py-3 font-bold text-white shadow-glow">Browse posts</Link>
         </div>
       </AppShell>
     );
@@ -31,64 +27,41 @@ function Cart() {
 
   return (
     <AppShell hideNav>
-      <PageHeader title="Your cart" subtitle={`from ${cart[0].product.vendor}`} />
-      <div className="p-5 space-y-3">
-        {cart.map((c) => (
-          <div key={c.product.id} className="flex gap-3 p-3 bg-card rounded-2xl border border-border shadow-card">
-            <img src={c.product.image} className="w-20 h-20 rounded-xl object-cover" alt="" />
-            <div className="flex-1 min-w-0">
-              <div className="font-semibold text-sm line-clamp-1">{c.product.name}</div>
-              <div className="text-xs text-muted-foreground">₹{c.product.price}</div>
-              <div className="mt-2 flex items-center justify-between">
-                <div className="inline-flex items-center bg-accent rounded-xl">
-                  <button onClick={() => setQty(c.product.id, c.qty - 1)} className="w-8 h-8 grid place-items-center"><Minus className="w-3 h-3" /></button>
-                  <span className="px-2 text-sm font-bold w-6 text-center">{c.qty}</span>
-                  <button onClick={() => setQty(c.product.id, c.qty + 1)} className="w-8 h-8 grid place-items-center"><Plus className="w-3 h-3" /></button>
+      <PageHeader title="Cart" />
+      <main className="mx-auto max-w-md space-y-3 p-5 pb-32">
+        {cart.map((item) => (
+          <article key={item.product.id} className="flex gap-3 rounded-2xl border border-border bg-card p-3 shadow-card">
+            <img src={item.product.image} alt={item.product.name} className="h-20 w-20 rounded-xl object-cover" />
+            <div className="min-w-0 flex-1">
+              <h2 className="line-clamp-1 text-sm font-bold">{item.product.name}</h2>
+              <p className="text-xs text-muted-foreground">Rs {item.product.price}</p>
+              <div className="mt-3 flex items-center justify-between">
+                <div className="flex items-center rounded-xl bg-accent">
+                  <button onClick={() => setQty(item.product.id, item.qty - 1)} className="grid h-8 w-8 place-items-center"><Minus className="h-3 w-3" /></button>
+                  <span className="w-7 text-center text-sm font-bold">{item.qty}</span>
+                  <button onClick={() => setQty(item.product.id, item.qty + 1)} className="grid h-8 w-8 place-items-center"><Plus className="h-3 w-3" /></button>
                 </div>
-                <button onClick={() => removeFromCart(c.product.id)} className="w-8 h-8 grid place-items-center text-muted-foreground"><Trash2 className="w-4 h-4" /></button>
+                <button onClick={() => removeFromCart(item.product.id)} className="grid h-8 w-8 place-items-center text-muted-foreground">
+                  <Trash2 className="h-4 w-4" />
+                </button>
               </div>
             </div>
-            <div className="text-sm font-bold">₹{c.product.price * c.qty}</div>
-          </div>
+            <strong>Rs {item.product.price * item.qty}</strong>
+          </article>
         ))}
+      </main>
 
-        <div className="flex items-center gap-3 p-3 bg-card rounded-2xl border-2 border-dashed border-border">
-          <Tag className="w-4 h-4 text-primary" />
-          <input placeholder="Promo code" className="flex-1 bg-transparent outline-none text-sm" />
-          <button className="text-xs font-semibold text-primary">APPLY</button>
-        </div>
-
-        <div className="p-4 bg-card rounded-2xl border border-border space-y-2 text-sm">
-          <Row label="Subtotal" value={`₹${subtotal}`} />
-          <Row label="Delivery" value={delivery === 0 ? "FREE" : `₹${delivery}`} muted={delivery === 0} />
-          <Row label="Taxes & fees" value={`₹${taxes}`} />
-          <div className="border-t border-border pt-2 flex items-center justify-between">
-            <span className="font-bold">Total</span>
-            <span className="font-display font-bold text-lg">₹{total}</span>
-          </div>
-        </div>
-      </div>
-
-      <div className="fixed bottom-0 left-0 right-0 safe-bottom px-4 pt-4 bg-gradient-to-t from-background via-background to-transparent">
-        <div className="mx-auto max-w-md flex items-center gap-3">
+      <div className="fixed bottom-0 left-0 right-0 safe-bottom bg-gradient-to-t from-background via-background to-transparent px-4 pt-4">
+        <div className="mx-auto flex max-w-md items-center gap-3">
           <div className="flex-1">
-            <div className="text-xs text-muted-foreground">Total · {cart.length} item{cart.length > 1 ? "s" : ""}</div>
-            <div className="font-display font-bold text-xl">₹{total}</div>
+            <p className="text-xs text-muted-foreground">Total</p>
+            <p className="font-display text-xl font-bold">Rs {total}</p>
           </div>
-          <Link to="/checkout" className="flex-1 grid place-items-center bg-gradient-warm text-white font-semibold py-4 rounded-2xl shadow-glow">
-            Checkout
+          <Link to="/checkout" className="flex-1 rounded-2xl bg-gradient-warm py-4 text-center font-bold text-white shadow-glow">
+            Order
           </Link>
         </div>
       </div>
     </AppShell>
-  );
-}
-
-function Row({ label, value, muted }: { label: string; value: string; muted?: boolean }) {
-  return (
-    <div className="flex items-center justify-between">
-      <span className="text-muted-foreground">{label}</span>
-      <span className={muted ? "text-mint font-semibold" : "font-medium"}>{value}</span>
-    </div>
   );
 }

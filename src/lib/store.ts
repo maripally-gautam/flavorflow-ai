@@ -1,66 +1,60 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import type { Product } from "./mock-data";
-import type { UserRole } from "./types";
+import type { LiveProduct, UserRole } from "./types";
 
-type CartItem = { product: Product; qty: number };
+type CartItem = { product: LiveProduct; qty: number };
 
 type AppState = {
   cart: CartItem[];
-  addToCart: (p: Product) => { ok: boolean; conflictVendor?: string };
-  forceAddToCart: (p: Product) => void;
+  addToCart: (product: LiveProduct) => { ok: boolean };
   removeFromCart: (id: string) => void;
   setQty: (id: string, qty: number) => void;
   clearCart: () => void;
 
   user: { name: string; role: UserRole; avatar?: string } | null;
-  setUser: (u: AppState["user"]) => void;
+  setUser: (user: AppState["user"]) => void;
 
   location: string;
-  setLocation: (l: string) => void;
-
-  dark: boolean;
-  toggleDark: () => void;
+  setLocation: (location: string) => void;
 };
 
 export const useApp = create<AppState>()(
   persist(
     (set, get) => ({
       cart: [],
-      addToCart: (p) => {
+      addToCart: (product) => {
         const cart = get().cart;
-        if (cart.length && cart[0].product.vendorId !== p.vendorId) {
-          return { ok: false, conflictVendor: cart[0].product.vendor };
+        const exists = cart.find((item) => item.product.id === product.id);
+        if (exists) {
+          set({
+            cart: cart.map((item) =>
+              item.product.id === product.id ? { ...item, qty: item.qty + 1 } : item,
+            ),
+          });
+        } else {
+          set({ cart: [...cart, { product, qty: 1 }] });
         }
-        const exists = cart.find((c) => c.product.id === p.id);
-        if (exists) set({ cart: cart.map((c) => c.product.id === p.id ? { ...c, qty: c.qty + 1 } : c) });
-        else set({ cart: [...cart, { product: p, qty: 1 }] });
         return { ok: true };
       },
-      forceAddToCart: (p) => set({ cart: [{ product: p, qty: 1 }] }),
-      removeFromCart: (id) => set({ cart: get().cart.filter((c) => c.product.id !== id) }),
+      removeFromCart: (id) => set({ cart: get().cart.filter((item) => item.product.id !== id) }),
       setQty: (id, qty) => {
-        if (qty <= 0) return set({ cart: get().cart.filter((c) => c.product.id !== id) });
-        set({ cart: get().cart.map((c) => c.product.id === id ? { ...c, qty } : c) });
+        if (qty <= 0) {
+          set({ cart: get().cart.filter((item) => item.product.id !== id) });
+          return;
+        }
+        set({
+          cart: get().cart.map((item) => (item.product.id === id ? { ...item, qty } : item)),
+        });
       },
       clearCart: () => set({ cart: [] }),
-
-      user: { name: "Aanya", role: "customer", avatar: "https://i.pravatar.cc/150?img=47" },
+      user: null,
       setUser: (user) => set({ user }),
-
-      location: "Indiranagar, Bengaluru",
+      location: "",
       setLocation: (location) => set({ location }),
-
-      dark: false,
-      toggleDark: () => {
-        const next = !get().dark;
-        set({ dark: next });
-        if (typeof document !== "undefined") document.documentElement.classList.toggle("dark", next);
-      },
     }),
-    { name: "curryflow" }
-  )
+    { name: "flavorflow" },
+  ),
 );
 
 export const cartTotal = (cart: CartItem[]) =>
-  cart.reduce((s, c) => s + c.product.price * c.qty, 0);
+  cart.reduce((sum, item) => sum + item.product.price * item.qty, 0);

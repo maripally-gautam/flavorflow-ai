@@ -1,150 +1,134 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { AppShell } from "@/components/AppShell";
-import { PageHeader } from "@/components/PageHeader";
-import { BadgeCheck, ChevronRight, FileCheck, IndianRupee, Package, Plus, Sparkles, TrendingUp } from "lucide-react";
+import { createFileRoute, Link } from "@tanstack/react-router";
+import { Plus, User, X } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
-import { useProducts, useVendorOrders } from "@/hooks/use-live-data";
+import { AppShell } from "@/components/AppShell";
+import { useProducts } from "@/hooks/use-live-data";
 import { useAuth, useRequireRole } from "@/lib/AuthProvider";
 import { createProduct } from "@/lib/services/products";
+import type { ProductSubItem } from "@/lib/types";
 
 export const Route = createFileRoute("/vendor")({ component: Vendor });
 
 function Vendor() {
   useRequireRole(["vendor", "admin"]);
   const { profile } = useAuth();
-  const [showForm, setShowForm] = useState(false);
-  const [title, setTitle] = useState("");
-  const [price, setPrice] = useState("");
-  const vendorId = profile?.uid ?? "v1";
+  const vendorId = profile?.uid ?? "local-admin";
   const { products } = useProducts(vendorId);
-  const liveOrders = useVendorOrders(vendorId);
+  const [open, setOpen] = useState(false);
+  const [name, setName] = useState("");
+  const [image, setImage] = useState("");
+  const [price, setPrice] = useState("");
+  const [subItems, setSubItems] = useState<ProductSubItem[]>([{ name: "", quantity: "" }]);
+  const [posting, setPosting] = useState(false);
+
   const publish = async () => {
-    await createProduct({
-      name: title || "New curry",
-      vendor: profile?.businessName ?? profile?.name ?? "Spice Route Kitchen",
-      vendorId,
-      price: Number(price || 199),
-      rating: 4.7,
-      reviews: 0,
-      eta: "25-30 min",
-      veg: true,
-      spice: 2,
-      image: "https://images.unsplash.com/photo-1631452180519-c014fe946bc7?auto=format&fit=crop&w=800&q=80",
-      category: "curry",
-      tags: ["New"],
-      description: "Freshly added by the vendor.",
-      active: true,
-      stock: 10,
-    });
-    setShowForm(false);
-    setTitle("");
-    setPrice("");
-    toast.success("Product added");
+    const cleanItems = subItems.filter((item) => item.name.trim() && item.quantity.trim());
+    if (!name.trim() || !image.trim() || !price.trim() || cleanItems.length === 0) {
+      toast.error("Add name, image link, sub items, and amount");
+      return;
+    }
+    const amount = Number(price);
+    if (!Number.isFinite(amount) || amount <= 0) {
+      toast.error("Enter a valid amount");
+      return;
+    }
+
+    setPosting(true);
+    try {
+      await createProduct({
+        name: name.trim(),
+        vendor: profile?.businessName || profile?.name || "Admin",
+        vendorId,
+        image: image.trim(),
+        category: profile?.category ?? "other",
+        price: amount,
+        subItems: cleanItems,
+        active: true,
+      });
+      setName("");
+      setImage("");
+      setPrice("");
+      setSubItems([{ name: "", quantity: "" }]);
+      setOpen(false);
+      toast.success("Posted successfully");
+    } catch (error) {
+      toast.error("Post failed", { description: error instanceof Error ? error.message : "Check Firebase setup." });
+    } finally {
+      setPosting(false);
+    }
   };
+
   return (
-    <AppShell>
-      <PageHeader title="Admin Dashboard" subtitle={profile?.businessName ?? profile?.name ?? "Food manager"} />
-      <div className="p-5 space-y-5">
-        {/* Status */}
-        <div className="p-4 rounded-2xl bg-gradient-ai text-white shadow-ai flex items-center gap-3">
-          <div className="w-11 h-11 rounded-xl bg-white/20 grid place-items-center"><BadgeCheck className="w-5 h-5" /></div>
-          <div className="flex-1">
-            <div className="font-semibold text-sm flex items-center gap-1.5">Food Admin <Sparkles className="w-3.5 h-3.5" /></div>
-            <div className="text-xs opacity-90">FSSAI cert valid till Mar 2027 · Trust 98%</div>
+    <AppShell hideNav>
+      <div className="safe-top sticky top-0 z-30 border-b border-border bg-background/95 px-5 py-4 backdrop-blur">
+        <div className="mx-auto flex max-w-md items-center justify-between">
+          <div>
+            <h1 className="font-display text-xl font-extrabold">Admin</h1>
+            <p className="text-xs text-muted-foreground">{profile?.businessName || profile?.name || "Your posts"}</p>
+          </div>
+          <button onClick={() => setOpen(true)} className="grid h-11 w-11 place-items-center rounded-xl bg-primary text-primary-foreground">
+            <Plus className="h-5 w-5" />
+          </button>
+        </div>
+      </div>
+
+      <main className="mx-auto max-w-md space-y-3 p-5">
+        {products.map((product) => (
+          <article key={product.id} className="overflow-hidden rounded-2xl border border-border bg-card shadow-card">
+            <img src={product.image} alt={product.name} className="h-44 w-full object-cover" />
+            <div className="p-4">
+              <div className="flex items-start justify-between gap-3">
+                <h2 className="font-bold">{product.name}</h2>
+                <span className="font-display font-bold">Rs {product.price}</span>
+              </div>
+              <div className="mt-3 space-y-1">
+                {product.subItems.map((item, index) => (
+                  <p key={`${item.name}-${index}`} className="text-sm text-muted-foreground">{item.name}: {item.quantity}</p>
+                ))}
+              </div>
+            </div>
+          </article>
+        ))}
+        {products.length === 0 && <p className="rounded-2xl border border-border bg-card p-6 text-center text-sm text-muted-foreground">No posts yet. Use add to publish your first item.</p>}
+      </main>
+
+      <Link to="/profile" className="fixed bottom-5 right-5 grid h-12 w-12 place-items-center rounded-full bg-foreground text-background shadow-card">
+        <User className="h-5 w-5" />
+      </Link>
+
+      {open && (
+        <div className="fixed inset-0 z-50 bg-black/45 px-4 py-8">
+          <div className="mx-auto max-h-full max-w-md overflow-auto rounded-2xl bg-background p-5 shadow-2xl">
+            <div className="flex items-center justify-between">
+              <h2 className="font-display text-xl font-bold">Add post</h2>
+              <button onClick={() => setOpen(false)} className="grid h-9 w-9 place-items-center rounded-xl border border-border">
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <div className="mt-4 space-y-3">
+              <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Name of curry, exercise kit, etc." className="w-full rounded-xl border border-border bg-card px-4 py-3 outline-none focus:border-primary" />
+              <input value={image} onChange={(e) => setImage(e.target.value)} placeholder="Image link" className="w-full rounded-xl border border-border bg-card px-4 py-3 outline-none focus:border-primary" />
+              <div className="space-y-2">
+                {subItems.map((item, index) => (
+                  <div key={index} className="grid grid-cols-[1fr_110px_36px] gap-2">
+                    <input value={item.name} onChange={(e) => setSubItems((items) => items.map((entry, i) => i === index ? { ...entry, name: e.target.value } : entry))} placeholder="Ingredient / dumbbell" className="rounded-xl border border-border bg-card px-3 py-3 outline-none focus:border-primary" />
+                    <input value={item.quantity} onChange={(e) => setSubItems((items) => items.map((entry, i) => i === index ? { ...entry, quantity: e.target.value } : entry))} placeholder="Qty" className="rounded-xl border border-border bg-card px-3 py-3 outline-none focus:border-primary" />
+                    <button onClick={() => setSubItems((items) => items.length === 1 ? items : items.filter((_, i) => i !== index))} className="rounded-xl border border-border">x</button>
+                  </div>
+                ))}
+                <button onClick={() => setSubItems((items) => [...items, { name: "", quantity: "" }])} className="w-full rounded-xl border border-dashed border-border py-3 text-sm font-semibold">
+                  + Add sub item
+                </button>
+              </div>
+              <input value={price} onChange={(e) => setPrice(e.target.value)} placeholder="Amount" inputMode="decimal" className="w-full rounded-xl border border-border bg-card px-4 py-3 outline-none focus:border-primary" />
+              <button onClick={publish} disabled={posting} className="w-full rounded-2xl bg-gradient-warm py-4 font-bold text-white shadow-glow disabled:opacity-60">
+                {posting ? "Posting..." : "Post"}
+              </button>
+            </div>
           </div>
         </div>
-
-        {/* Analytics */}
-        <div className="grid grid-cols-2 gap-3">
-          <Stat icon={IndianRupee} label="Today" value={`₹${liveOrders.reduce((sum, order) => sum + order.total, 0)}`} gradient="bg-gradient-warm" />
-          <Stat icon={Package} label="Orders" value={String(liveOrders.length)} />
-          <Stat icon={TrendingUp} label="Live" value={String(liveOrders.filter((o) => o.status !== "DELIVERED").length)} />
-          <Stat icon={FileCheck} label="Inventory" value={`${products.length} items`} />
-        </div>
-
-        {/* Active orders */}
-        <Section title="Active orders" right={<span className="text-xs text-muted-foreground">{liveOrders.filter((o) => o.status !== "DELIVERED").length} live</span>}>
-          {liveOrders.filter((o) => o.status !== "DELIVERED").map((order) => (
-            <div key={order.id} className="flex items-center gap-3 p-3 bg-card border border-border rounded-2xl">
-              <div className="w-10 h-10 rounded-xl bg-primary/10 text-primary grid place-items-center font-bold">#{order.id.slice(-2)}</div>
-              <div className="flex-1">
-                <div className="font-semibold text-sm">{order.items.map((item) => `${item.qty}x ${item.name}`).join(" · ")}</div>
-                <div className="text-xs text-muted-foreground">₹{order.total} · {order.status}</div>
-              </div>
-              <span className="px-3 py-1.5 text-xs font-bold bg-accent rounded-lg">{order.status}</span>
-            </div>
-          ))}
-          {liveOrders.filter((o) => o.status !== "DELIVERED").length === 0 && (
-            <div className="p-3 bg-card border border-border rounded-2xl text-sm text-muted-foreground">No active orders yet.</div>
-          )}
-        </Section>
-
-        {/* Products */}
-        <Section title="Your menu" right={
-          <button onClick={() => setShowForm(!showForm)} className="text-xs font-semibold text-primary flex items-center gap-1">
-            <Plus className="w-3 h-3" />Add
-          </button>
-        }>
-          {showForm && (
-            <div className="p-4 rounded-2xl bg-card border-2 border-primary mb-2 space-y-2">
-              <div className="font-display font-bold">Add new product</div>
-              <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Product title" className="w-full px-3 py-2.5 rounded-xl bg-background border border-border text-sm outline-none" />
-              <div className="grid grid-cols-2 gap-2">
-                <input value={price} onChange={(e) => setPrice(e.target.value)} placeholder="Price ₹" className="px-3 py-2.5 rounded-xl bg-background border border-border text-sm outline-none" />
-                <input placeholder="Stock" className="px-3 py-2.5 rounded-xl bg-background border border-border text-sm outline-none" />
-              </div>
-              <div className="grid grid-cols-2 gap-2">
-                <select className="px-3 py-2.5 rounded-xl bg-background border border-border text-sm outline-none">
-                  <option>Curry</option><option>Meal Kit</option><option>Ingredient</option>
-                </select>
-                <select className="px-3 py-2.5 rounded-xl bg-background border border-border text-sm outline-none">
-                  <option>Veg</option><option>Non-veg</option>
-                </select>
-              </div>
-              <div className="border-2 border-dashed border-border rounded-xl p-4 grid place-items-center text-xs text-muted-foreground">
-                Tap to upload images
-              </div>
-              <button onClick={publish}
-                className="w-full bg-gradient-warm text-white font-semibold py-3 rounded-xl">Publish</button>
-            </div>
-          )}
-          {products.map((p) => (
-            <div key={p.id} className="flex items-center gap-3 p-3 bg-card border border-border rounded-2xl">
-              <img src={p.image} className="w-12 h-12 rounded-xl object-cover" alt="" />
-              <div className="flex-1 min-w-0">
-                <div className="font-semibold text-sm truncate">{p.name}</div>
-                <div className="text-xs text-muted-foreground">₹{p.price} · In stock</div>
-              </div>
-              <ChevronRight className="w-4 h-4 text-muted-foreground" />
-            </div>
-          ))}
-        </Section>
-      </div>
+      )}
     </AppShell>
-  );
-}
-
-function Stat({ icon: Icon, label, value, delta, sub, gradient }: any) {
-  return (
-    <div className={`p-3.5 rounded-2xl ${gradient ?? "bg-card border border-border"} ${gradient ? "text-white shadow-glow" : ""}`}>
-      <div className="flex items-center justify-between">
-        <Icon className="w-4 h-4 opacity-80" />
-        {delta && <span className={`text-[10px] font-bold ${gradient ? "bg-white/20" : "bg-mint/15 text-mint"} px-1.5 py-0.5 rounded-full`}>{delta}</span>}
-      </div>
-      <div className="font-display font-bold text-xl mt-2">{value}</div>
-      <div className={`text-xs ${gradient ? "opacity-90" : "text-muted-foreground"}`}>{sub ?? label}</div>
-    </div>
-  );
-}
-function Section({ title, right, children }: any) {
-  return (
-    <div>
-      <div className="flex items-center justify-between mb-2">
-        <h3 className="font-display font-bold">{title}</h3>
-        {right}
-      </div>
-      <div className="space-y-2">{children}</div>
-    </div>
   );
 }

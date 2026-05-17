@@ -1,109 +1,98 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { AppShell } from "@/components/AppShell";
-import { PageHeader } from "@/components/PageHeader";
-import { useApp, cartTotal } from "@/lib/store";
-import { Briefcase, CheckCircle2, Home, Plus, Wallet } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
+import { AppShell } from "@/components/AppShell";
+import { PageHeader } from "@/components/PageHeader";
+import { cartTotal, useApp } from "@/lib/store";
 import { createOrder } from "@/lib/services/orders";
 import { useAuth } from "@/lib/AuthProvider";
 
 export const Route = createFileRoute("/checkout")({ component: Checkout });
 
-const addresses = [
-  { id: "a1", label: "Home", icon: Home, line: "302, Indiranagar 6th Main, Bengaluru 560038" },
-  { id: "a2", label: "Work", icon: Briefcase, line: "Embassy Tech Park, Bengaluru 560066" },
-];
+const slots = ["7am to 8am", "8am to 9am", "12pm to 1pm", "6pm to 7pm", "7pm to 8pm"];
 
 function Checkout() {
-  const { cart, clearCart } = useApp();
+  const { cart, clearCart, location } = useApp();
   const { profile } = useAuth();
   const nav = useNavigate();
-  const [addr, setAddr] = useState("a1");
-  const [placing, setPlacing] = useState(false);
-  const subtotal = cartTotal(cart);
-  const delivery = subtotal > 299 ? 0 : 29;
-  const taxes = Math.round(subtotal * 0.05);
-  const total = subtotal + delivery + taxes;
+  const [address, setAddress] = useState(profile?.location || location || "");
+  const [slot, setSlot] = useState(slots[0]);
+  const [paying, setPaying] = useState(false);
+  const total = cartTotal(cart);
 
-  const placeOrder = async () => {
-    if (!cart.length) return;
-    setPlacing(true);
+  const pay = async () => {
+    if (!cart.length) {
+      toast.error("Cart is empty");
+      return;
+    }
+    if (!address.trim()) {
+      toast.error("Enter delivery location");
+      return;
+    }
+
+    setPaying(true);
     try {
+      await new Promise((resolve) => setTimeout(resolve, 600));
+      toast.success("Payment completed");
       const order = await createOrder({
-        customerId: profile?.uid ?? "demo-customer",
-        customerName: profile?.name ?? "Demo Customer",
+        customerId: profile?.uid ?? "local-user",
+        customerName: profile?.name ?? "User",
         cart,
-        address: addresses.find((a) => a.id === addr)?.line ?? addresses[0].line,
-        subtotal,
-        deliveryFee: delivery,
-        taxes,
+        address: address.trim(),
+        timeSlot: slot,
+        subtotal: total,
         total,
-        paymentMethod: "cod",
-        paymentStatus: "cod",
       });
-      toast.success("Order placed!", { description: `Your delivery OTP is ${order.otp}` });
       clearCart();
       nav({ to: "/track/$id", params: { id: order.id } });
     } catch (error) {
       toast.error("Order failed", { description: error instanceof Error ? error.message : "Try again." });
     } finally {
-      setPlacing(false);
+      setPaying(false);
     }
   };
 
   return (
     <AppShell hideNav>
-      <PageHeader title="Checkout" />
-      <div className="p-5 space-y-5">
-        <section>
-          <div className="flex items-center justify-between mb-3">
-            <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Delivery address</h3>
-            <button className="text-xs font-semibold text-primary flex items-center gap-1"><Plus className="w-3 h-3" />Add</button>
-          </div>
-          <div className="space-y-2">
-            {addresses.map((a) => {
-              const Icon = a.icon;
-              const active = addr === a.id;
-              return (
-                <button key={a.id} onClick={() => setAddr(a.id)}
-                  className={`w-full flex items-start gap-3 p-3 rounded-2xl border-2 text-left transition ${active ? "border-primary bg-primary/5" : "border-border bg-card"}`}>
-                  <div className="w-10 h-10 rounded-xl bg-accent grid place-items-center"><Icon className="w-4 h-4" /></div>
-                  <div className="flex-1 min-w-0">
-                    <div className="font-semibold text-sm flex items-center gap-1.5">{a.label} {active && <CheckCircle2 className="w-4 h-4 text-primary" />}</div>
-                    <div className="text-xs text-muted-foreground line-clamp-2">{a.line}</div>
-                  </div>
-                </button>
-              );
-            })}
-          </div>
+      <PageHeader title="Payment" />
+      <main className="mx-auto max-w-md space-y-5 p-5 pb-32">
+        <section className="rounded-2xl border border-border bg-card p-4">
+          <h2 className="font-bold">Delivery location</h2>
+          <input value={address} onChange={(e) => setAddress(e.target.value)} placeholder="Enter your location" className="mt-3 w-full rounded-xl border border-border bg-background px-4 py-3 outline-none focus:border-primary" />
         </section>
 
-        <section className="p-4 rounded-2xl bg-card border border-border">
-          <h3 className="font-display font-bold mb-1">Evaluation order</h3>
-          <p className="text-sm text-muted-foreground">No payment gateway. Tap place order and it will appear live for the delivery person.</p>
-        </section>
-
-        <section className="p-4 rounded-2xl bg-card border border-border">
-          <h3 className="font-display font-bold mb-2">Order summary</h3>
-          <div className="space-y-1 text-sm">
-            {cart.map((c) => (
-              <div key={c.product.id} className="flex justify-between">
-                <span className="text-muted-foreground">{c.qty}x {c.product.name}</span>
-                <span>₹{c.product.price * c.qty}</span>
-              </div>
+        <section className="rounded-2xl border border-border bg-card p-4">
+          <h2 className="font-bold">Time slot</h2>
+          <div className="mt-3 grid grid-cols-2 gap-2">
+            {slots.map((item) => (
+              <button key={item} onClick={() => setSlot(item)} className={`rounded-xl border px-3 py-3 text-sm font-semibold ${slot === item ? "border-primary bg-primary text-primary-foreground" : "border-border bg-background"}`}>
+                {item}
+              </button>
             ))}
           </div>
-          <div className="border-t border-border mt-3 pt-3 flex justify-between font-bold">
-            <span>Total</span><span>₹{total}</span>
+        </section>
+
+        <section className="rounded-2xl border border-border bg-card p-4">
+          <h2 className="font-bold">Total payment</h2>
+          <div className="mt-3 space-y-2 text-sm">
+            {cart.map((item) => (
+              <div key={item.product.id} className="flex justify-between gap-3">
+                <span className="text-muted-foreground">{item.qty}x {item.product.name}</span>
+                <span>Rs {item.product.price * item.qty}</span>
+              </div>
+            ))}
+            <div className="border-t border-border pt-3 font-bold flex justify-between">
+              <span>Total</span>
+              <span>Rs {total}</span>
+            </div>
           </div>
         </section>
-      </div>
+      </main>
 
-      <div className="fixed bottom-0 left-0 right-0 safe-bottom px-4 pt-4 bg-gradient-to-t from-background via-background to-transparent">
+      <div className="fixed bottom-0 left-0 right-0 safe-bottom bg-gradient-to-t from-background via-background to-transparent px-4 pt-4">
         <div className="mx-auto max-w-md">
-          <button onClick={placeOrder} disabled={placing || cart.length === 0} className="w-full bg-gradient-warm text-white font-semibold py-4 rounded-2xl shadow-glow active:scale-[0.98] transition flex items-center justify-center gap-2 disabled:opacity-60">
-            <Wallet className="w-4 h-4" /> {placing ? "Placing order..." : `Place order · ₹${total}`}
+          <button onClick={pay} disabled={paying || !cart.length} className="w-full rounded-2xl bg-gradient-warm py-4 font-bold text-white shadow-glow disabled:opacity-60">
+            {paying ? "Processing..." : `Pay Rs ${total}`}
           </button>
         </div>
       </div>

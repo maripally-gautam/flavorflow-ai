@@ -36,7 +36,7 @@ export function listenVendors(cb: (vendors: VendorProfile[]) => void) {
 }
 
 export async function createProduct(product: Omit<LiveProduct, "id">) {
-  if (!firestore) return `demo-${Date.now()}`;
+  if (!firestore) return `local-${Date.now()}`;
   const ref = await addDoc(collection(firestore, "products"), {
     ...product,
     active: product.active ?? true,

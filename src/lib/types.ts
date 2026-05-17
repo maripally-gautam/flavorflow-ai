@@ -1,37 +1,51 @@
-import type { Product } from "./mock-data";
-
 export type UserRole = "customer" | "vendor" | "admin" | "delivery";
+
+export type SignupCategory = "food" | "trip-kit" | "gym-kit" | "other";
 
 export type UserProfile = {
   uid: string;
   name: string;
-  email: string;
+  email?: string;
   phone?: string;
-  city?: string;
+  location?: string;
   role: UserRole;
   avatar?: string;
   businessName?: string;
-  fcmTokens?: string[];
+  category?: SignupCategory;
+  fssaiVerified?: boolean;
   createdAt?: unknown;
   updatedAt?: unknown;
 };
 
-export type LiveProduct = Product & {
-  stock?: number;
+export type ProductSubItem = {
+  name: string;
+  quantity: string;
+};
+
+export type LiveProduct = {
+  id: string;
+  name: string;
+  vendor: string;
+  vendorId: string;
+  image: string;
+  category: SignupCategory;
+  price: number;
+  description?: string;
+  subItems: ProductSubItem[];
   active?: boolean;
   createdAt?: unknown;
   updatedAt?: unknown;
 };
 
 export type OrderStatus =
-  | "PLACED"
+  | "ORDERED"
   | "ACCEPTED"
-  | "PICKED_UP"
-  | "OUT_FOR_DELIVERY"
-  | "DELIVERED";
+  | "TAKEN"
+  | "ON_THE_WAY"
+  | "REACHED"
+  | "FINISHED";
 
-export type PaymentMethod = "cod";
-export type PaymentStatus = "cod";
+export type PaymentStatus = "completed";
 
 export type OrderItem = {
   productId: string;
@@ -51,14 +65,11 @@ export type Order = {
   status: OrderStatus;
   items: OrderItem[];
   subtotal: number;
-  deliveryFee: number;
-  taxes: number;
   total: number;
   address: string;
+  timeSlot: string;
   otp: string;
-  paymentMethod: PaymentMethod;
   paymentStatus: PaymentStatus;
-  etaMinutes?: number;
   createdAt?: unknown;
   updatedAt?: unknown;
 };
@@ -66,7 +77,7 @@ export type Order = {
 export type AppNotification = {
   id: string;
   userId: string;
-  type: "order" | "ai" | "offer" | "system";
+  type: "order" | "system";
   title: string;
   body: string;
   unread: boolean;
@@ -78,12 +89,9 @@ export type VendorProfile = {
   id: string;
   ownerId: string;
   name: string;
+  category: SignupCategory;
   verified?: boolean;
-  fssaiNumber?: string;
-  fssaiExpiry?: string;
-  fssaiStatus?: "valid" | "invalid" | "needs_review";
-  certificatePath?: string;
-  trustScore?: number;
+  fssaiVerified?: boolean;
 };
 
 export type DeliveryPartnerProfile = {
@@ -92,14 +100,4 @@ export type DeliveryPartnerProfile = {
   name: string;
   online: boolean;
   activeOrderId?: string | null;
-  rating?: number;
-  vehicle?: string;
 };
-
-export type AiIntent =
-  | { intent: "SEARCH_PRODUCTS"; query: string; filters?: { category?: Product["category"]; maxPrice?: number; veg?: boolean; spicy?: boolean } }
-  | { intent: "RECOMMEND_PRODUCTS"; query: string; budget?: number }
-  | { intent: "TRACK_ORDER"; orderId?: string }
-  | { intent: "ADD_TO_CART"; productName: string }
-  | { intent: "GENERATE_MEAL_KIT"; cuisine?: string; budget?: number; serves?: number; spice?: number }
-  | { intent: "GENERAL_HELP"; message: string };

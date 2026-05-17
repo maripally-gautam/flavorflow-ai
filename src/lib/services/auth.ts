@@ -1,16 +1,16 @@
 import {
+  browserLocalPersistence,
   onAuthStateChanged,
   setPersistence,
-  browserLocalPersistence,
   signInWithPopup,
   signOut,
   type User,
 } from "firebase/auth";
-import { doc, getDoc, serverTimestamp, setDoc, updateDoc } from "firebase/firestore";
+import { doc, getDoc, serverTimestamp, setDoc } from "firebase/firestore";
 import { firebaseAuth, firestore, googleProvider, requireFirebase } from "@/lib/firebase";
 import type { UserProfile, UserRole } from "@/lib/types";
 
-const demoProfiles: Record<string, UserProfile> = {};
+const localProfiles: Record<string, UserProfile> = {};
 
 export function onAuthChanged(cb: (user: User | null) => void) {
   if (!firebaseAuth) {
@@ -22,44 +22,41 @@ export function onAuthChanged(cb: (user: User | null) => void) {
 }
 
 export async function getUserProfile(uid: string) {
-  if (!firestore) return demoProfiles[uid] ?? null;
+  if (!firestore) return localProfiles[uid] ?? null;
   const snap = await getDoc(doc(firestore, "users", uid));
   return snap.exists() ? ({ uid, ...snap.data() } as UserProfile) : null;
 }
 
 export async function upsertUserProfile(uid: string, profile: Partial<UserProfile>) {
   if (!firestore) {
-    demoProfiles[uid] = { ...(demoProfiles[uid] ?? {}), uid, ...(profile as UserProfile) };
-    return demoProfiles[uid];
+    localProfiles[uid] = { ...(localProfiles[uid] ?? { uid, name: "", role: "customer" }), ...profile, uid } as UserProfile;
+    return localProfiles[uid];
   }
   const ref = doc(firestore, "users", uid);
   const existing = await getDoc(ref);
-  const data = {
-    ...profile,
-    uid,
-    updatedAt: serverTimestamp(),
-    ...(existing.exists() ? {} : { createdAt: serverTimestamp() }),
-  };
-  await setDoc(ref, data, { merge: true });
+  await setDoc(
+    ref,
+    {
+      ...profile,
+      uid,
+      updatedAt: serverTimestamp(),
+      ...(existing.exists() ? {} : { createdAt: serverTimestamp() }),
+    },
+    { merge: true },
+  );
   return getUserProfile(uid);
 }
 
-export async function signInWithGoogle(role: UserRole = "customer") {
+export async function signInWithGoogle(role: UserRole = "customer", profileData: Partial<UserProfile> = {}) {
   const { auth } = requireFirebase();
   const result = await signInWithPopup(auth, googleProvider);
-  const profile = await getUserProfile(result.user.uid);
-  if (profile) return profile;
   return upsertUserProfile(result.user.uid, {
     email: result.user.email ?? "",
-    name: result.user.displayName ?? "CurryFlow User",
-    role,
+    name: profileData.name || result.user.displayName || "FlavorFlow user",
     avatar: result.user.photoURL ?? undefined,
+    role,
+    ...profileData,
   });
-}
-
-export async function updateUserProfile(uid: string, data: Partial<UserProfile>) {
-  if (!firestore) return upsertUserProfile(uid, data);
-  await updateDoc(doc(firestore, "users", uid), { ...data, updatedAt: serverTimestamp() });
 }
 
 export async function logout() {

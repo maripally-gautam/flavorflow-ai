@@ -1,12 +1,11 @@
 import { getToken } from "firebase/messaging";
 import { arrayUnion, collection, doc, onSnapshot, orderBy, query, serverTimestamp, updateDoc, where } from "firebase/firestore";
 import { firestore, getFirebaseMessaging } from "@/lib/firebase";
-import { notifications as mockNotifications } from "@/lib/mock-data";
 import type { AppNotification } from "@/lib/types";
 
 export function listenNotifications(userId: string | undefined, cb: (notifications: AppNotification[]) => void) {
   if (!firestore || !userId) {
-    cb(mockNotifications.map((n) => ({ ...n, userId: "demo" } as AppNotification)));
+    cb([]);
     return () => undefined;
   }
   return onSnapshot(
@@ -33,7 +32,7 @@ export async function registerFcmToken(uid: string) {
 }
 
 export async function markNotificationsRead(userId: string, items: AppNotification[]) {
-  if (!firestore) return;
+  if (!firestore || !userId) return;
   await Promise.all(
     items
       .filter((item) => item.unread)

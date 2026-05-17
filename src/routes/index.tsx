@@ -35,14 +35,14 @@ function Splash() {
             <Sparkles className="w-4 h-4 text-ember" />
           </motion.span>
         </motion.div>
-        <h1 className="font-display font-extrabold text-5xl tracking-tight">CurryFlow</h1>
-        <p className="mt-2 text-white/85 text-sm font-medium tracking-wide">AI-POWERED FOOD COMMERCE</p>
+        <h1 className="font-display font-extrabold text-5xl tracking-tight">FlavorFlow</h1>
+        <p className="mt-2 text-white/85 text-sm font-medium tracking-wide">POST. ORDER. DELIVER.</p>
       </motion.div>
       <motion.div
         initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 1.2 }}
         className="absolute bottom-12 text-white/70 text-xs"
       >
-        crafted with 🌶️ by CurryFlow Labs
+        Simple ordering for local posts
       </motion.div>
     </div>
   );

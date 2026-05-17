@@ -31,7 +31,7 @@ function Login() {
     <div className="min-h-screen bg-background bg-mesh">
       <PageHeader title="Welcome back" sticky={false} />
       <div className="px-6 pt-4">
-        <h2 className="font-display font-extrabold text-3xl">Sign in to <span className="text-gradient-warm">CurryFlow</span></h2>
+        <h2 className="font-display font-extrabold text-3xl">Sign in to <span className="text-gradient-warm">FlavorFlow</span></h2>
         <p className="text-muted-foreground text-sm mt-1">Continue with Google to open your role-based dashboard.</p>
 
         <button onClick={google} disabled={loading} className="mt-8 w-full flex items-center justify-center gap-3 py-4 bg-card border border-border rounded-2xl font-medium text-sm active:scale-[0.98] transition disabled:opacity-60">
