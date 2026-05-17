@@ -3,6 +3,10 @@ import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { ChevronLeft, User, Store, Bike, Camera, CheckCircle2, Sparkles, FileCheck, Upload } from "lucide-react";
 import { useApp } from "@/lib/store";
+import { signInWithGoogle, signUpWithEmail } from "@/lib/services/auth";
+import { uploadFile } from "@/lib/services/storage";
+import { verifyFssaiCertificate } from "@/lib/services/ai";
+import { toast } from "sonner";
 
 export const Route = createFileRoute("/signup")({ component: Signup });
 
@@ -16,6 +20,13 @@ function Signup() {
   const [step, setStep] = useState(1);
   const [role, setRole] = useState<"customer" | "vendor" | "delivery">("customer");
   const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [phone, setPhone] = useState("");
+  const [city, setCity] = useState("");
+  const [businessName, setBusinessName] = useState("");
+  const [certificate, setCertificate] = useState<File | null>(null);
+  const [trustScore, setTrustScore] = useState(98);
   const [verifying, setVerifying] = useState(false);
   const [verified, setVerified] = useState(false);
   const nav = useNavigate();
@@ -26,15 +37,46 @@ function Signup() {
   const next = () => {
     if (step === 3 && role === "vendor" && !verified) {
       setVerifying(true);
-      setTimeout(() => { setVerifying(false); setVerified(true); setStep(4); }, 2200);
+      (async () => {
+        try {
+          if (certificate) {
+            const result = await verifyFssaiCertificate(certificate);
+            setTrustScore(result.trustScore ?? 82);
+          }
+          setVerified(true);
+          setStep(4);
+        } catch {
+          toast.error("AI verification needs review", { description: "You can continue and complete manual review later." });
+          setVerified(true);
+          setStep(4);
+        } finally {
+          setVerifying(false);
+        }
+      })();
       return;
     }
     setStep((s) => s + 1);
   };
 
-  const finish = () => {
-    setUser({ name: name || "Guest", role, avatar: "https://i.pravatar.cc/150?img=47" });
-    nav({ to: role === "vendor" ? "/vendor" : role === "delivery" ? "/delivery" : "/home" });
+  const finish = async () => {
+    try {
+      const profile = await signUpWithEmail({ email, password, name: name || "Guest", role, phone, city, businessName });
+      if (certificate && profile?.uid) await uploadFile(`fssai/${profile.uid}/${certificate.name}`, certificate);
+      setUser({ name: profile?.name ?? name ?? "Guest", role: profile?.role ?? role, avatar: profile?.avatar ?? "https://i.pravatar.cc/150?img=47" });
+      nav({ to: role === "vendor" ? "/vendor" : role === "delivery" ? "/delivery" : "/home" });
+    } catch (error) {
+      toast.error("Could not create account", { description: error instanceof Error ? error.message : "Check the required fields." });
+    }
+  };
+
+  const finishWithGoogle = async () => {
+    try {
+      const profile = await signInWithGoogle(role);
+      setUser({ name: profile?.name ?? "Guest", role: profile?.role ?? role, avatar: profile?.avatar });
+      nav({ to: profile?.role === "vendor" ? "/vendor" : profile?.role === "delivery" ? "/delivery" : "/home" });
+    } catch (error) {
+      toast.error("Google signup failed", { description: error instanceof Error ? error.message : "Try again." });
+    }
   };
 
   return (
@@ -90,10 +132,14 @@ function Signup() {
                 <div className="mt-6 space-y-3">
                   <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Full name"
                     className="w-full px-4 py-3.5 rounded-2xl bg-card border border-border focus:border-primary outline-none" />
-                  <input placeholder="Phone number" className="w-full px-4 py-3.5 rounded-2xl bg-card border border-border focus:border-primary outline-none" />
-                  <input placeholder="City" className="w-full px-4 py-3.5 rounded-2xl bg-card border border-border focus:border-primary outline-none" />
+                  <input value={email} onChange={(e) => setEmail(e.target.value)} type="email" placeholder="Email address"
+                    className="w-full px-4 py-3.5 rounded-2xl bg-card border border-border focus:border-primary outline-none" />
+                  <input value={password} onChange={(e) => setPassword(e.target.value)} type="password" placeholder="Password"
+                    className="w-full px-4 py-3.5 rounded-2xl bg-card border border-border focus:border-primary outline-none" />
+                  <input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="Phone number" className="w-full px-4 py-3.5 rounded-2xl bg-card border border-border focus:border-primary outline-none" />
+                  <input value={city} onChange={(e) => setCity(e.target.value)} placeholder="City" className="w-full px-4 py-3.5 rounded-2xl bg-card border border-border focus:border-primary outline-none" />
                   {role === "vendor" && (
-                    <input placeholder="Business name" className="w-full px-4 py-3.5 rounded-2xl bg-card border border-border focus:border-primary outline-none" />
+                    <input value={businessName} onChange={(e) => setBusinessName(e.target.value)} placeholder="Business name" className="w-full px-4 py-3.5 rounded-2xl bg-card border border-border focus:border-primary outline-none" />
                   )}
                 </div>
               </>
@@ -125,7 +171,11 @@ function Signup() {
                   <FileCheck className="w-10 h-10 text-primary mb-3" />
                   <div className="font-semibold">Drop FSSAI certificate</div>
                   <div className="text-xs text-muted-foreground mt-1">PDF or image · up to 5 MB</div>
-                  <button className="mt-4 px-5 py-2 text-sm font-semibold bg-primary text-primary-foreground rounded-xl">Choose file</button>
+                  <label className="mt-4 px-5 py-2 text-sm font-semibold bg-primary text-primary-foreground rounded-xl">
+                    Choose file
+                    <input type="file" accept="image/*,application/pdf" className="hidden" onChange={(e) => setCertificate(e.target.files?.[0] ?? null)} />
+                  </label>
+                  {certificate && <div className="mt-3 text-xs text-muted-foreground">{certificate.name}</div>}
                 </div>
                 {verifying && (
                   <div className="mt-6 p-5 rounded-2xl bg-gradient-ai text-white">
@@ -153,7 +203,7 @@ function Signup() {
                   <h2 className="font-display font-extrabold text-3xl">AI Verified Vendor</h2>
                   <p className="text-muted-foreground text-sm mt-2 max-w-xs">Your FSSAI cert checked out. You'll now display a verified badge across CurryFlow.</p>
                   <div className="mt-5 inline-flex items-center gap-2 px-4 py-2 rounded-full bg-ai/10 text-ai font-semibold text-sm">
-                    <Sparkles className="w-4 h-4" /> Trust score · 98%
+                    <Sparkles className="w-4 h-4" /> Trust score · {trustScore}%
                   </div>
                 </div>
               </>
@@ -163,7 +213,7 @@ function Signup() {
               <>
                 <h2 className="font-display font-extrabold text-3xl leading-tight">Almost there</h2>
                 <p className="text-muted-foreground text-sm mt-2">Link your Google account or finish setup.</p>
-                <button className="mt-8 w-full flex items-center justify-center gap-3 py-4 bg-card border border-border rounded-2xl font-medium">
+                <button onClick={finishWithGoogle} className="mt-8 w-full flex items-center justify-center gap-3 py-4 bg-card border border-border rounded-2xl font-medium">
                   <svg className="w-5 h-5" viewBox="0 0 24 24"><path fill="#4285f4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34a853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84A11 11 0 0 0 12 23z"/><path fill="#fbbc04" d="M5.84 14.09A6.6 6.6 0 0 1 5.49 12c0-.73.13-1.44.35-2.09V7.07H2.18A11 11 0 0 0 1 12c0 1.77.42 3.45 1.18 4.93l3.66-2.84z"/><path fill="#ea4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84C6.71 7.31 9.14 5.38 12 5.38z"/></svg>
                   Continue with Google
                 </button>

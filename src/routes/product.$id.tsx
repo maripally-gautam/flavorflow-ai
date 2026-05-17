@@ -1,16 +1,18 @@
 import { createFileRoute, useParams, Link } from "@tanstack/react-router";
-import { products } from "@/lib/mock-data";
+import { products as fallbackProducts } from "@/lib/mock-data";
 import { Heart, Share2, Star, Clock, Flame, Minus, Plus, Sparkles, ChevronLeft, BadgeCheck } from "lucide-react";
 import { useApp } from "@/lib/store";
 import { toast } from "sonner";
 import { useState } from "react";
 import { useRouter } from "@tanstack/react-router";
+import { useProducts } from "@/hooks/use-live-data";
 
 export const Route = createFileRoute("/product/$id")({ component: ProductDetail });
 
 function ProductDetail() {
   const { id } = useParams({ from: "/product/$id" });
-  const product = products.find((p) => p.id === id);
+  const { products } = useProducts();
+  const product = (products.length ? products : fallbackProducts).find((p) => p.id === id);
   const { addToCart, cart, setQty } = useApp();
   const router = useRouter();
   const [fav, setFav] = useState(false);

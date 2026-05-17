@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import type { Product } from "./mock-data";
+import type { UserRole } from "./types";
 
 type CartItem = { product: Product; qty: number };
 
@@ -12,7 +13,7 @@ type AppState = {
   setQty: (id: string, qty: number) => void;
   clearCart: () => void;
 
-  user: { name: string; role: "customer" | "vendor" | "delivery"; avatar?: string } | null;
+  user: { name: string; role: UserRole; avatar?: string } | null;
   setUser: (u: AppState["user"]) => void;
 
   location: string;

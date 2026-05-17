@@ -7,6 +7,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useApp } from "@/lib/store";
 import { products } from "@/lib/mock-data";
 import { toast } from "sonner";
+import { generateMealKit } from "@/lib/services/ai";
 
 export const Route = createFileRoute("/meal-kit")({ component: MealKit });
 
@@ -21,13 +22,23 @@ function MealKit() {
   const [loading, setLoading] = useState(false);
   const forceAdd = useApp((s) => s.forceAddToCart);
 
-  const generate = () => {
+  const generate = async () => {
     setLoading(true);
     setGenerated(null);
-    setTimeout(() => {
-      setGenerated(products.find((p) => p.category === "kit") ?? products[2]);
+    try {
+      const kit = await generateMealKit({ cuisine, budget, serves, spice });
+      const base = products.find((p) => p.category === "kit") ?? products[2];
+      setGenerated({
+        ...base,
+        id: `ai-kit-${Date.now()}`,
+        name: kit.name ?? base.name,
+        price: kit.estimatedCost ?? Math.min(base.price, budget),
+        ingredients: kit.ingredients ?? base.ingredients,
+        description: (kit.instructions ?? []).join(" • ") || base.description,
+      });
+    } finally {
       setLoading(false);
-    }, 1800);
+    }
   };
 
   return (

@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">CookNet</string>
+    <string name="title_activity_main">CookNet</string>
+    <string name="package_name">com.cooknet.app</string>
+    <string name="custom_url_scheme">com.cooknet.app</string>
+</resources>

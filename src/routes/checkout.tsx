@@ -5,6 +5,9 @@ import { useApp, cartTotal } from "@/lib/store";
 import { Briefcase, CheckCircle2, Home, MapPin, Plus, Wallet } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
+import { createOrder } from "@/lib/services/orders";
+import { payWithRazorpay } from "@/lib/services/payments";
+import { useAuth } from "@/lib/AuthProvider";
 
 export const Route = createFileRoute("/checkout")({ component: Checkout });
 
@@ -21,17 +24,51 @@ const payments = [
 
 function Checkout() {
   const { cart, clearCart } = useApp();
+  const { profile } = useAuth();
   const nav = useNavigate();
   const [addr, setAddr] = useState("a1");
   const [pay, setPay] = useState("razorpay");
+  const [placing, setPlacing] = useState(false);
   const subtotal = cartTotal(cart);
   const delivery = subtotal > 299 ? 0 : 29;
   const total = subtotal + delivery + Math.round(subtotal * 0.05);
 
-  const placeOrder = () => {
-    toast.success("Order placed!", { description: `Your order will arrive in 25-30 min` });
-    clearCart();
-    setTimeout(() => nav({ to: "/track/$id", params: { id: "ORD8421" } }), 600);
+  const placeOrder = async () => {
+    if (!cart.length) return;
+    setPlacing(true);
+    try {
+      let paymentStatus: "paid" | "cod" | "failed" | "pending" = pay === "cod" ? "cod" : "pending";
+      let razorpayPaymentId: string | undefined;
+      if (pay === "razorpay") {
+        const payment = await payWithRazorpay({ amount: total, name: profile?.name ?? "CurryFlow User", email: profile?.email });
+        if (!payment.ok) {
+          toast.error("Payment failed", { description: payment.reason });
+          return;
+        }
+        paymentStatus = "paid";
+        razorpayPaymentId = payment.paymentId;
+      }
+      const order = await createOrder({
+        customerId: profile?.uid ?? "demo-customer",
+        customerName: profile?.name ?? "Demo Customer",
+        cart,
+        address: addresses.find((a) => a.id === addr)?.line ?? addresses[0].line,
+        subtotal,
+        deliveryFee: delivery,
+        taxes: Math.round(subtotal * 0.05),
+        total,
+        paymentMethod: pay as "razorpay" | "cod" | "wallet",
+        paymentStatus,
+        razorpayPaymentId,
+      });
+      toast.success("Order placed!", { description: `OTP ${order.otp} generated for delivery verification.` });
+      clearCart();
+      nav({ to: "/track/$id", params: { id: order.id } });
+    } catch (error) {
+      toast.error("Order failed", { description: error instanceof Error ? error.message : "Try again." });
+    } finally {
+      setPlacing(false);
+    }
   };
 
   return (
@@ -101,8 +138,8 @@ function Checkout() {
 
       <div className="fixed bottom-0 left-0 right-0 safe-bottom px-4 pt-4 bg-gradient-to-t from-background via-background to-transparent">
         <div className="mx-auto max-w-md">
-          <button onClick={placeOrder} className="w-full bg-gradient-warm text-white font-semibold py-4 rounded-2xl shadow-glow active:scale-[0.98] transition flex items-center justify-center gap-2">
-            <Wallet className="w-4 h-4" /> Place order · ₹{total}
+          <button onClick={placeOrder} disabled={placing || cart.length === 0} className="w-full bg-gradient-warm text-white font-semibold py-4 rounded-2xl shadow-glow active:scale-[0.98] transition flex items-center justify-center gap-2 disabled:opacity-60">
+            <Wallet className="w-4 h-4" /> {placing ? "Placing order..." : `Place order · ₹${total}`}
           </button>
         </div>
       </div>

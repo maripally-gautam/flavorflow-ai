@@ -2,7 +2,8 @@ import { createFileRoute, Link, useParams } from "@tanstack/react-router";
 import { PageHeader } from "@/components/PageHeader";
 import { motion } from "framer-motion";
 import { CheckCircle2, Phone, MessageCircle, Bike, Package, Utensils, MapPin, ChefHat } from "lucide-react";
-import { useState, useEffect } from "react";
+import { useOrder } from "@/hooks/use-live-data";
+import { orderStep } from "@/lib/services/orders";
 
 export const Route = createFileRoute("/track/$id")({ component: Track });
 
@@ -16,12 +17,8 @@ const stages = [
 
 function Track() {
   const { id } = useParams({ from: "/track/$id" });
-  const [step, setStep] = useState(3);
-
-  useEffect(() => {
-    const t = setInterval(() => setStep((s) => (s < 4 ? s + 1 : s)), 6000);
-    return () => clearInterval(t);
-  }, []);
+  const order = useOrder(id);
+  const step = order ? orderStep(order.status) : 0;
 
   return (
     <div className="min-h-screen bg-background bg-mesh pb-24">
@@ -35,7 +32,7 @@ function Track() {
           <div className="relative">
             <div className="text-xs font-medium opacity-90">Arriving in</div>
             <div className="font-display font-extrabold text-5xl mt-1">{step >= 4 ? "Done" : `${Math.max(8 - step * 2, 2)} min`}</div>
-            <div className="text-sm opacity-90 mt-1 flex items-center gap-1"><MapPin className="w-3.5 h-3.5" />302, Indiranagar 6th Main</div>
+            <div className="text-sm opacity-90 mt-1 flex items-center gap-1"><MapPin className="w-3.5 h-3.5" />{order?.address ?? "302, Indiranagar 6th Main"}</div>
           </div>
         </div>
 
@@ -85,7 +82,7 @@ function Track() {
             <div className="mt-4 p-3 rounded-xl bg-gradient-ai text-white">
               <div className="text-xs opacity-90">Share OTP with delivery partner</div>
               <div className="flex gap-2 mt-1.5">
-                {["4","8","2","7"].map((d, i) => (
+                {(order?.otp ?? "4827").split("").map((d, i) => (
                   <div key={i} className="w-10 h-12 rounded-lg bg-white/20 backdrop-blur grid place-items-center font-bold text-lg">{d}</div>
                 ))}
               </div>

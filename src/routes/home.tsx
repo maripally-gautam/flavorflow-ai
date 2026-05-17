@@ -1,17 +1,19 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { AppShell } from "@/components/AppShell";
 import { ProductCard } from "@/components/ProductCard";
-import { categories, offers, products, vendors } from "@/lib/mock-data";
+import { categories, offers, vendors } from "@/lib/mock-data";
 import { useApp } from "@/lib/store";
 import { Bell, ChevronDown, MapPin, Search, ShoppingBag, Sparkles, Star, BadgeCheck } from "lucide-react";
 import { motion } from "framer-motion";
 import { useState } from "react";
+import { useProducts } from "@/hooks/use-live-data";
 
 export const Route = createFileRoute("/home")({ component: Home });
 
 function Home() {
   const { user, location, cart } = useApp();
   const [cat, setCat] = useState("all");
+  const { products, loading } = useProducts();
   const cartCount = cart.reduce((s, c) => s + c.qty, 0);
 
   const filtered = cat === "all" ? products : products.filter((p) =>
@@ -145,7 +147,8 @@ function Home() {
       {/* Recommended grid */}
       <Section title="Recommended for you" subtitle="Based on your spice profile 🌶️🌶️">
         <div className="px-5 grid grid-cols-2 gap-3">
-          {filtered.slice(0, 6).map((p) => <ProductCard key={p.id} product={p} />)}
+          {loading && Array.from({ length: 4 }).map((_, i) => <div key={i} className="h-48 rounded-2xl bg-card animate-pulse" />)}
+          {!loading && filtered.slice(0, 6).map((p) => <ProductCard key={p.id} product={p} />)}
         </div>
       </Section>
 

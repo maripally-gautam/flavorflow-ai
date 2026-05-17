@@ -2,17 +2,49 @@ import { createFileRoute } from "@tanstack/react-router";
 import { AppShell } from "@/components/AppShell";
 import { PageHeader } from "@/components/PageHeader";
 import { BadgeCheck, ChevronRight, FileCheck, IndianRupee, Package, Plus, Sparkles, TrendingUp } from "lucide-react";
-import { products } from "@/lib/mock-data";
 import { useState } from "react";
 import { toast } from "sonner";
+import { useProducts, useVendorOrders } from "@/hooks/use-live-data";
+import { useAuth, useRequireRole } from "@/lib/AuthProvider";
+import { createProduct } from "@/lib/services/products";
 
 export const Route = createFileRoute("/vendor")({ component: Vendor });
 
 function Vendor() {
+  useRequireRole(["vendor"]);
+  const { profile } = useAuth();
   const [showForm, setShowForm] = useState(false);
+  const [title, setTitle] = useState("");
+  const [price, setPrice] = useState("");
+  const vendorId = profile?.uid ?? "v1";
+  const { products } = useProducts(vendorId);
+  const liveOrders = useVendorOrders(vendorId);
+  const publish = async () => {
+    await createProduct({
+      name: title || "New curry",
+      vendor: profile?.businessName ?? profile?.name ?? "Spice Route Kitchen",
+      vendorId,
+      price: Number(price || 199),
+      rating: 4.7,
+      reviews: 0,
+      eta: "25-30 min",
+      veg: true,
+      spice: 2,
+      image: "https://images.unsplash.com/photo-1631452180519-c014fe946bc7?auto=format&fit=crop&w=800&q=80",
+      category: "curry",
+      tags: ["New"],
+      description: "Freshly added by the vendor.",
+      active: true,
+      stock: 10,
+    });
+    setShowForm(false);
+    setTitle("");
+    setPrice("");
+    toast.success("Product added");
+  };
   return (
     <AppShell>
-      <PageHeader title="Vendor Dashboard" subtitle="Spice Route Kitchen" />
+      <PageHeader title="Vendor Dashboard" subtitle={profile?.businessName ?? profile?.name ?? "Spice Route Kitchen"} />
       <div className="p-5 space-y-5">
         {/* Status */}
         <div className="p-4 rounded-2xl bg-gradient-ai text-white shadow-ai flex items-center gap-3">
@@ -32,7 +64,7 @@ function Vendor() {
         </div>
 
         {/* Active orders */}
-        <Section title="Active orders" right={<span className="text-xs text-muted-foreground">3 new</span>}>
+        <Section title="Active orders" right={<span className="text-xs text-muted-foreground">{liveOrders.filter((o) => o.status !== "DELIVERED").length} live</span>}>
           {[1,2,3].map((i) => (
             <div key={i} className="flex items-center gap-3 p-3 bg-card border border-border rounded-2xl">
               <div className="w-10 h-10 rounded-xl bg-primary/10 text-primary grid place-items-center font-bold">#{84 + i}</div>
@@ -54,9 +86,9 @@ function Vendor() {
           {showForm && (
             <div className="p-4 rounded-2xl bg-card border-2 border-primary mb-2 space-y-2">
               <div className="font-display font-bold">Add new product</div>
-              <input placeholder="Product title" className="w-full px-3 py-2.5 rounded-xl bg-background border border-border text-sm outline-none" />
+              <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Product title" className="w-full px-3 py-2.5 rounded-xl bg-background border border-border text-sm outline-none" />
               <div className="grid grid-cols-2 gap-2">
-                <input placeholder="Price ₹" className="px-3 py-2.5 rounded-xl bg-background border border-border text-sm outline-none" />
+                <input value={price} onChange={(e) => setPrice(e.target.value)} placeholder="Price ₹" className="px-3 py-2.5 rounded-xl bg-background border border-border text-sm outline-none" />
                 <input placeholder="Stock" className="px-3 py-2.5 rounded-xl bg-background border border-border text-sm outline-none" />
               </div>
               <div className="grid grid-cols-2 gap-2">
@@ -70,11 +102,11 @@ function Vendor() {
               <div className="border-2 border-dashed border-border rounded-xl p-4 grid place-items-center text-xs text-muted-foreground">
                 Tap to upload images
               </div>
-              <button onClick={() => { setShowForm(false); toast.success("Product added"); }}
+              <button onClick={publish}
                 className="w-full bg-gradient-warm text-white font-semibold py-3 rounded-xl">Publish</button>
             </div>
           )}
-          {products.filter(p => p.vendorId === "v1").map((p) => (
+          {products.map((p) => (
             <div key={p.id} className="flex items-center gap-3 p-3 bg-card border border-border rounded-2xl">
               <img src={p.image} className="w-12 h-12 rounded-xl object-cover" alt="" />
               <div className="flex-1 min-w-0">
