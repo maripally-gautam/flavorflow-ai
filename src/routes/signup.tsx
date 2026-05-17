@@ -1,16 +1,17 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { Bike, CheckCircle2, ChevronLeft, FileCheck, Store, User } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { useApp } from "@/lib/store";
-import { signInWithGoogle } from "@/lib/services/auth";
+import { signUpWithGoogle } from "@/lib/services/auth";
+import { useAuth } from "@/lib/AuthProvider";
 import { verifyFssaiCertificate } from "@/lib/services/ai";
 import type { SignupCategory, UserRole } from "@/lib/types";
 
 export const Route = createFileRoute("/signup")({ component: Signup });
 
 const roleOptions = [
-  { id: "vendor", label: "Vendor", detail: "Post food, trip kits, gym kits, and more.", icon: Store },
+  { id: "admin", label: "Admin", detail: "Post food, trip kits, gym kits, and more.", icon: Store },
   { id: "customer", label: "User", detail: "Order posted items and track delivery.", icon: User },
   { id: "delivery", label: "Delivery Person", detail: "Accept paid orders and update delivery.", icon: Bike },
 ] as const;
@@ -26,6 +27,7 @@ function Signup() {
   const nav = useNavigate();
   const setUser = useApp((state) => state.setUser);
   const setLocation = useApp((state) => state.setLocation);
+  const { profile, loading: authLoading } = useAuth();
   const [role, setRole] = useState<UserRole | null>(null);
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
@@ -36,14 +38,21 @@ function Signup() {
   const [licenseVerified, setLicenseVerified] = useState(false);
   const [busy, setBusy] = useState(false);
 
-  const needsLicense = role === "vendor" && category === "food";
+  const isAdminRole = role === "admin" || role === "vendor";
+  const needsLicense = isAdminRole && category === "food";
   const detailsComplete = useMemo(() => {
     const base = name.trim() && phone.trim() && location.trim();
-    if (role === "vendor") return Boolean(base && businessName.trim() && category);
+    if (isAdminRole) return Boolean(base && businessName.trim() && category);
     return Boolean(base);
-  }, [businessName, category, location, name, phone, role]);
+  }, [businessName, category, isAdminRole, location, name, phone]);
 
-  const destination = role === "delivery" ? "/delivery" : role === "vendor" ? "/vendor" : "/home";
+  const routeForRole = (value?: UserRole | null) =>
+    value === "vendor" || value === "admin" ? "/vendor" : value === "delivery" ? "/delivery" : "/home";
+
+  useEffect(() => {
+    if (authLoading || !profile) return;
+    nav({ to: routeForRole(profile.role) });
+  }, [authLoading, nav, profile]);
 
   const completeSignup = async () => {
     if (!role) return;
@@ -58,17 +67,18 @@ function Signup() {
 
     setBusy(true);
     try {
-      const profile = await signInWithGoogle(role, {
+      const profile = await signUpWithGoogle(role, {
         name: name.trim(),
         phone: phone.trim(),
         location: location.trim(),
         businessName: businessName.trim() || undefined,
-        category: role === "vendor" ? category : undefined,
+        category: isAdminRole ? category : undefined,
         fssaiVerified: needsLicense ? licenseVerified : undefined,
       });
-      setUser({ name: profile?.name || name, role, avatar: profile?.avatar });
-      setLocation(location.trim());
-      nav({ to: destination });
+      const resolvedRole = profile?.role ?? role;
+      setUser({ name: profile?.name || name, role: resolvedRole, avatar: profile?.avatar });
+      setLocation(profile?.location || location.trim());
+      nav({ to: routeForRole(resolvedRole) });
     } catch (error) {
       toast.error("Google sign in failed", { description: error instanceof Error ? error.message : "Check Firebase auth setup." });
     } finally {
@@ -130,14 +140,14 @@ function Signup() {
         ) : (
           <>
             <h1 className="font-display text-3xl font-extrabold">
-              {role === "vendor" ? "Vendor sign up" : role === "delivery" ? "Delivery sign up" : "User sign up"}
+              {isAdminRole ? "Admin sign up" : role === "delivery" ? "Delivery sign up" : "User sign up"}
             </h1>
             <div className="mt-6 space-y-3">
               <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Name" className="w-full rounded-2xl border border-border bg-card px-4 py-3 outline-none focus:border-primary" />
               <input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="Phone number" inputMode="tel" className="w-full rounded-2xl border border-border bg-card px-4 py-3 outline-none focus:border-primary" />
               <input value={location} onChange={(e) => setLocationValue(e.target.value)} placeholder="Location" className="w-full rounded-2xl border border-border bg-card px-4 py-3 outline-none focus:border-primary" />
 
-              {role === "vendor" && (
+              {isAdminRole && (
                 <>
                   <input value={businessName} onChange={(e) => setBusinessName(e.target.value)} placeholder="Business name" className="w-full rounded-2xl border border-border bg-card px-4 py-3 outline-none focus:border-primary" />
                   <select value={category} onChange={(e) => { setCategory(e.target.value as SignupCategory); setLicenseVerified(false); }} className="w-full rounded-2xl border border-border bg-card px-4 py-3 outline-none focus:border-primary">
@@ -165,7 +175,7 @@ function Signup() {
             )}
 
             <button onClick={completeSignup} disabled={busy || !detailsComplete || (needsLicense && !licenseVerified)} className="mt-6 w-full rounded-2xl bg-gradient-warm py-4 font-bold text-white shadow-glow disabled:opacity-50">
-              {busy ? "Please wait..." : role === "vendor" ? "Sign in vendor with Google" : "Sign in with Google"}
+              {busy ? "Please wait..." : isAdminRole ? "Sign in admin with Google" : "Sign in with Google"}
             </button>
           </>
         )}
