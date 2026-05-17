@@ -15,6 +15,12 @@ type AuthContextValue = {
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
+function routeForRole(role: UserRole) {
+  if (role === "vendor" || role === "admin") return "/vendor";
+  if (role === "delivery") return "/delivery";
+  return "/home";
+}
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [profile, setProfile] = useState<UserProfile | null>(null);
@@ -67,7 +73,7 @@ export function useRequireRole(roles?: UserRole[]) {
   useEffect(() => {
     if (auth.loading || !auth.firebaseReady) return;
     if (!auth.profile) nav({ to: "/login" });
-    else if (roles?.length && !roles.includes(auth.profile.role)) nav({ to: "/home" });
+    else if (roles?.length && !roles.includes(auth.profile.role)) nav({ to: routeForRole(auth.profile.role) });
   }, [auth.loading, auth.firebaseReady, auth.profile, nav, roles]);
 
   return auth;

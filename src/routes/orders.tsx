@@ -1,12 +1,13 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { AppShell } from "@/components/AppShell";
 import { PageHeader } from "@/components/PageHeader";
-import { useAuth } from "@/lib/AuthProvider";
+import { useAuth, useRequireRole } from "@/lib/AuthProvider";
 import { useCustomerOrders } from "@/hooks/use-live-data";
 
 export const Route = createFileRoute("/orders")({ component: Orders });
 
 function Orders() {
+  useRequireRole(["customer"]);
   const { profile } = useAuth();
   const orders = useCustomerOrders(profile?.uid);
 

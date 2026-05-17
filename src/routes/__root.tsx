@@ -9,6 +9,8 @@ import {
 } from "@tanstack/react-router";
 import { Toaster } from "@/components/ui/sonner";
 import { AuthProvider } from "@/lib/AuthProvider";
+import { useApp } from "@/lib/store";
+import { useEffect } from "react";
 import appCss from "../styles.css?url";
 
 function NotFoundComponent() {
@@ -72,7 +74,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
 
 function RootShell({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
+    <html lang="en" className="dark">
       <head>
         <HeadContent />
       </head>
@@ -88,10 +90,22 @@ function RootComponent() {
   const { queryClient } = Route.useRouteContext();
   return (
     <QueryClientProvider client={queryClient}>
+      <ThemeSync />
       <AuthProvider>
         <Outlet />
         <Toaster position="top-center" richColors closeButton />
       </AuthProvider>
     </QueryClientProvider>
   );
+}
+
+function ThemeSync() {
+  const theme = useApp((state) => state.theme ?? "dark");
+
+  useEffect(() => {
+    document.documentElement.classList.toggle("dark", theme === "dark");
+    document.documentElement.style.colorScheme = theme;
+  }, [theme]);
+
+  return null;
 }

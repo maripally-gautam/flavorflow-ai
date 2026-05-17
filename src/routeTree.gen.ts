@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as WelcomeRouteImport } from './routes/welcome'
 import { Route as VendorRouteImport } from './routes/vendor'
 import { Route as SignupRouteImport } from './routes/signup'
+import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as SearchRouteImport } from './routes/search'
 import { Route as ProfileRouteImport } from './routes/profile'
 import { Route as OrdersRouteImport } from './routes/orders'
@@ -40,6 +41,11 @@ const VendorRoute = VendorRouteImport.update({
 const SignupRoute = SignupRouteImport.update({
   id: '/signup',
   path: '/signup',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SettingsRoute = SettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SearchRoute = SearchRouteImport.update({
@@ -126,6 +132,7 @@ export interface FileRoutesByFullPath {
   '/orders': typeof OrdersRoute
   '/profile': typeof ProfileRoute
   '/search': typeof SearchRoute
+  '/settings': typeof SettingsRoute
   '/signup': typeof SignupRoute
   '/vendor': typeof VendorRoute
   '/welcome': typeof WelcomeRoute
@@ -145,6 +152,7 @@ export interface FileRoutesByTo {
   '/orders': typeof OrdersRoute
   '/profile': typeof ProfileRoute
   '/search': typeof SearchRoute
+  '/settings': typeof SettingsRoute
   '/signup': typeof SignupRoute
   '/vendor': typeof VendorRoute
   '/welcome': typeof WelcomeRoute
@@ -165,6 +173,7 @@ export interface FileRoutesById {
   '/orders': typeof OrdersRoute
   '/profile': typeof ProfileRoute
   '/search': typeof SearchRoute
+  '/settings': typeof SettingsRoute
   '/signup': typeof SignupRoute
   '/vendor': typeof VendorRoute
   '/welcome': typeof WelcomeRoute
@@ -186,6 +195,7 @@ export interface FileRouteTypes {
     | '/orders'
     | '/profile'
     | '/search'
+    | '/settings'
     | '/signup'
     | '/vendor'
     | '/welcome'
@@ -205,6 +215,7 @@ export interface FileRouteTypes {
     | '/orders'
     | '/profile'
     | '/search'
+    | '/settings'
     | '/signup'
     | '/vendor'
     | '/welcome'
@@ -224,6 +235,7 @@ export interface FileRouteTypes {
     | '/orders'
     | '/profile'
     | '/search'
+    | '/settings'
     | '/signup'
     | '/vendor'
     | '/welcome'
@@ -244,6 +256,7 @@ export interface RootRouteChildren {
   OrdersRoute: typeof OrdersRoute
   ProfileRoute: typeof ProfileRoute
   SearchRoute: typeof SearchRoute
+  SettingsRoute: typeof SettingsRoute
   SignupRoute: typeof SignupRoute
   VendorRoute: typeof VendorRoute
   WelcomeRoute: typeof WelcomeRoute
@@ -272,6 +285,13 @@ declare module '@tanstack/react-router' {
       path: '/signup'
       fullPath: '/signup'
       preLoaderRoute: typeof SignupRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/settings': {
+      id: '/settings'
+      path: '/settings'
+      fullPath: '/settings'
+      preLoaderRoute: typeof SettingsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/search': {
@@ -388,6 +408,7 @@ const rootRouteChildren: RootRouteChildren = {
   OrdersRoute: OrdersRoute,
   ProfileRoute: ProfileRoute,
   SearchRoute: SearchRoute,
+  SettingsRoute: SettingsRoute,
   SignupRoute: SignupRoute,
   VendorRoute: VendorRoute,
   WelcomeRoute: WelcomeRoute,

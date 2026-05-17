@@ -3,6 +3,7 @@ import { persist } from "zustand/middleware";
 import type { LiveProduct, UserRole } from "./types";
 
 type CartItem = { product: LiveProduct; qty: number };
+type AppTheme = "light" | "dark";
 
 type AppState = {
   cart: CartItem[];
@@ -16,6 +17,9 @@ type AppState = {
 
   location: string;
   setLocation: (location: string) => void;
+
+  theme: AppTheme;
+  setTheme: (theme: AppTheme) => void;
 };
 
 export const useApp = create<AppState>()(
@@ -51,6 +55,8 @@ export const useApp = create<AppState>()(
       setUser: (user) => set({ user }),
       location: "",
       setLocation: (location) => set({ location }),
+      theme: "dark",
+      setTheme: (theme) => set({ theme }),
     }),
     { name: "flavorflow" },
   ),

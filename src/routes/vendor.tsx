@@ -1,9 +1,9 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { Plus, User, X } from "lucide-react";
+import { Plus, Settings, User, X } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import { AppShell } from "@/components/AppShell";
-import { useProducts } from "@/hooks/use-live-data";
+import { useProducts, useVendorOrders } from "@/hooks/use-live-data";
 import { useAuth, useRequireRole } from "@/lib/AuthProvider";
 import { createProduct } from "@/lib/services/products";
 import type { ProductSubItem } from "@/lib/types";
@@ -15,6 +15,7 @@ function Vendor() {
   const { profile } = useAuth();
   const vendorId = profile?.uid ?? "local-admin";
   const { products } = useProducts(vendorId);
+  const orders = useVendorOrders(vendorId);
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
   const [image, setImage] = useState("");
@@ -67,30 +68,56 @@ function Vendor() {
             <h1 className="font-display text-xl font-extrabold">Admin</h1>
             <p className="text-xs text-muted-foreground">{profile?.businessName || profile?.name || "Your posts"}</p>
           </div>
-          <button onClick={() => setOpen(true)} className="grid h-11 w-11 place-items-center rounded-xl bg-primary text-primary-foreground">
-            <Plus className="h-5 w-5" />
-          </button>
+          <div className="flex items-center gap-2">
+            <Link to="/settings" className="grid h-11 w-11 place-items-center rounded-xl border border-border bg-card">
+              <Settings className="h-5 w-5" />
+            </Link>
+            <button onClick={() => setOpen(true)} className="grid h-11 w-11 place-items-center rounded-xl bg-primary text-primary-foreground">
+              <Plus className="h-5 w-5" />
+            </button>
+          </div>
         </div>
       </div>
 
-      <main className="mx-auto max-w-md space-y-3 p-5">
-        {products.map((product) => (
-          <article key={product.id} className="overflow-hidden rounded-2xl border border-border bg-card shadow-card">
-            <img src={product.image} alt={product.name} className="h-44 w-full object-cover" />
-            <div className="p-4">
+      <main className="mx-auto max-w-md space-y-6 p-5">
+        <section className="space-y-3">
+          <h2 className="font-display text-lg font-bold">Your posts</h2>
+          {products.map((product) => (
+            <article key={product.id} className="overflow-hidden rounded-2xl border border-border bg-card shadow-card">
+              <img src={product.image} alt={product.name} className="h-44 w-full object-cover" />
+              <div className="p-4">
+                <div className="flex items-start justify-between gap-3">
+                  <h3 className="font-bold">{product.name}</h3>
+                  <span className="font-display font-bold">Rs {product.price}</span>
+                </div>
+                <div className="mt-3 space-y-1">
+                  {product.subItems.map((item, index) => (
+                    <p key={`${item.name}-${index}`} className="text-sm text-muted-foreground">{item.name}: {item.quantity}</p>
+                  ))}
+                </div>
+              </div>
+            </article>
+          ))}
+          {products.length === 0 && <p className="rounded-2xl border border-border bg-card p-6 text-center text-sm text-muted-foreground">No posts yet. Use add to publish your first item.</p>}
+        </section>
+
+        <section className="space-y-3">
+          <h2 className="font-display text-lg font-bold">Paid orders</h2>
+          {orders.map((order) => (
+            <article key={order.id} className="rounded-2xl border border-border bg-card p-4 shadow-card">
               <div className="flex items-start justify-between gap-3">
-                <h2 className="font-bold">{product.name}</h2>
-                <span className="font-display font-bold">Rs {product.price}</span>
+                <div>
+                  <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">{order.status.replaceAll("_", " ")}</p>
+                  <h3 className="mt-1 font-bold">{order.items.map((item) => `${item.qty}x ${item.name}`).join(", ")}</h3>
+                  <p className="mt-2 text-sm text-muted-foreground">{order.customerName || "Customer"} - {order.timeSlot}</p>
+                  <p className="mt-1 text-sm text-muted-foreground">{order.address}</p>
+                </div>
+                <strong>Rs {order.total}</strong>
               </div>
-              <div className="mt-3 space-y-1">
-                {product.subItems.map((item, index) => (
-                  <p key={`${item.name}-${index}`} className="text-sm text-muted-foreground">{item.name}: {item.quantity}</p>
-                ))}
-              </div>
-            </div>
-          </article>
-        ))}
-        {products.length === 0 && <p className="rounded-2xl border border-border bg-card p-6 text-center text-sm text-muted-foreground">No posts yet. Use add to publish your first item.</p>}
+            </article>
+          ))}
+          {orders.length === 0 && <p className="rounded-2xl border border-border bg-card p-6 text-center text-sm text-muted-foreground">No paid orders yet.</p>}
+        </section>
       </main>
 
       <Link to="/profile" className="fixed bottom-5 right-5 grid h-12 w-12 place-items-center rounded-full bg-foreground text-background shadow-card">

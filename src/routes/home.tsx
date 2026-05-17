@@ -1,14 +1,16 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { LogOut, ShoppingCart, User } from "lucide-react";
+import { LogOut, Settings, ShoppingCart, User } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
 import { ProductCard } from "@/components/ProductCard";
 import { useProducts } from "@/hooks/use-live-data";
+import { useRequireRole } from "@/lib/AuthProvider";
 import { useApp } from "@/lib/store";
 import { logout } from "@/lib/services/auth";
 
 export const Route = createFileRoute("/home")({ component: Home });
 
 function Home() {
+  useRequireRole(["customer"]);
   const { products, loading } = useProducts();
   const cart = useApp((state) => state.cart);
   const user = useApp((state) => state.user);
@@ -29,6 +31,9 @@ function Home() {
             </Link>
             <Link to="/profile" className="grid h-11 w-11 place-items-center rounded-xl border border-border bg-card">
               <User className="h-5 w-5" />
+            </Link>
+            <Link to="/settings" className="grid h-11 w-11 place-items-center rounded-xl border border-border bg-card">
+              <Settings className="h-5 w-5" />
             </Link>
             <button onClick={logout} className="grid h-11 w-11 place-items-center rounded-xl bg-foreground text-background">
               <LogOut className="h-5 w-5" />

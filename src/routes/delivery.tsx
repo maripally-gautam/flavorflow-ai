@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { MapPin, Search, User } from "lucide-react";
+import { MapPin, Search, Settings, User } from "lucide-react";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { AppShell } from "@/components/AppShell";
@@ -47,9 +47,14 @@ function Delivery() {
             <h1 className="font-display text-xl font-extrabold">Delivery</h1>
             <p className="text-xs text-muted-foreground">{profile?.name || "Delivery person"}</p>
           </div>
-          <Link to="/profile" className="grid h-11 w-11 place-items-center rounded-xl border border-border bg-card">
-            <User className="h-5 w-5" />
-          </Link>
+          <div className="flex items-center gap-2">
+            <Link to="/profile" className="grid h-11 w-11 place-items-center rounded-xl border border-border bg-card">
+              <User className="h-5 w-5" />
+            </Link>
+            <Link to="/settings" className="grid h-11 w-11 place-items-center rounded-xl border border-border bg-card">
+              <Settings className="h-5 w-5" />
+            </Link>
+          </div>
         </div>
         <div className="mx-auto mt-4 flex max-w-md items-center gap-3 rounded-2xl border border-border bg-card px-4 py-3">
           <Search className="h-4 w-4 text-muted-foreground" />

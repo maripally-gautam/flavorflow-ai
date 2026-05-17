@@ -5,13 +5,14 @@ import { AppShell } from "@/components/AppShell";
 import { PageHeader } from "@/components/PageHeader";
 import { cartTotal, useApp } from "@/lib/store";
 import { createOrder } from "@/lib/services/orders";
-import { useAuth } from "@/lib/AuthProvider";
+import { useAuth, useRequireRole } from "@/lib/AuthProvider";
 
 export const Route = createFileRoute("/checkout")({ component: Checkout });
 
 const slots = ["7am to 8am", "8am to 9am", "12pm to 1pm", "6pm to 7pm", "7pm to 8pm"];
 
 function Checkout() {
+  useRequireRole(["customer"]);
   const { cart, clearCart, location } = useApp();
   const { profile } = useAuth();
   const nav = useNavigate();
