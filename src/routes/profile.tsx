@@ -15,6 +15,8 @@ const categoryLabels: Record<string, string> = {
   other: "📦 Other",
 };
 
+const sampleAvatarUrl = "/sample-boy.svg";
+
 function Profile() {
   const user = useApp((state) => state.user);
   const setUser = useApp((state) => state.setUser);
@@ -39,9 +41,9 @@ function Profile() {
       : user?.role === "delivery"
         ? [{ to: "/delivery" as const, label: "Delivery orders" }]
         : [
-            { to: "/home" as const, label: "Order items" },
-            { to: "/orders" as const, label: "My orders" },
-          ];
+          { to: "/home" as const, label: "Order items" },
+          { to: "/orders" as const, label: "My orders" },
+        ];
 
   return (
     <AppShell hideNav>
@@ -53,9 +55,11 @@ function Profile() {
             {profile?.avatar ? (
               <img src={profile.avatar} alt={profile.name} className="h-16 w-16 rounded-2xl object-cover border-2 border-primary" />
             ) : (
-              <div className="grid h-16 w-16 place-items-center rounded-2xl bg-gradient-warm text-white text-xl font-bold">
-                {(user?.name || "U").charAt(0).toUpperCase()}
-              </div>
+              <img
+                src={sampleAvatarUrl}
+                alt="Sample profile avatar"
+                className="h-16 w-16 rounded-2xl object-cover border-2 border-primary"
+              />
             )}
             <div>
               <h1 className="font-display text-2xl font-bold">{user?.name || "Profile"}</h1>
