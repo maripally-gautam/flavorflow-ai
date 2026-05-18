@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { Plus, Settings, User, X, Trash2, Edit3, Package } from "lucide-react";
+import { Plus, Settings, User, X, Trash2, Edit3, Package, Upload } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import { motion } from "framer-motion";
@@ -7,6 +7,7 @@ import { AppShell } from "@/components/AppShell";
 import { useProducts, useVendorOrders } from "@/hooks/use-live-data";
 import { useAuth, useRequireRole } from "@/lib/AuthProvider";
 import { createProduct, deleteProduct } from "@/lib/services/products";
+import { uploadFile } from "@/lib/services/storage";
 import type { ProductSubItem } from "@/lib/types";
 
 export const Route = createFileRoute("/vendor")({ component: Vendor });
@@ -31,15 +32,35 @@ function Vendor() {
   const [subItems, setSubItems] = useState<ProductSubItem[]>([{ name: "", quantity: "" }]);
   const [posting, setPosting] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [uploadProgress, setUploadProgress] = useState<number | null>(null);
 
   const categoryDisplay = profile?.category === "other" && profile?.customCategory
     ? `📦 ${profile.customCategory}`
     : categoryLabels[profile?.category ?? "other"] ?? "📦 Other";
 
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setUploadProgress(0);
+    try {
+      const path = `products/${Date.now()}_${file.name}`;
+      const res = await uploadFile(path, file, (progress) => {
+        setUploadProgress(progress);
+      });
+      setImage(res.url);
+      toast.success("Image uploaded successfully!");
+    } catch (error) {
+      toast.error("Image upload failed", { description: error instanceof Error ? error.message : "Try again." });
+    } finally {
+      setUploadProgress(null);
+    }
+  };
+
   const publish = async () => {
     const cleanItems = subItems.filter((item) => item.name.trim() && item.quantity.trim());
     if (!name.trim() || !image.trim() || !price.trim() || cleanItems.length === 0) {
-      toast.error("Add name, image link, sub items, and amount");
+      toast.error("Add name, image, sub items, and amount");
       return;
     }
     const amount = Number(price);
@@ -200,7 +221,54 @@ function Vendor() {
             </div>
             <div className="mt-4 space-y-3">
               <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Name of curry, exercise kit, etc." className="w-full rounded-xl border border-border bg-card px-4 py-3 outline-none focus:border-primary" />
-              <input value={image} onChange={(e) => setImage(e.target.value)} placeholder="Image link" className="w-full rounded-xl border border-border bg-card px-4 py-3 outline-none focus:border-primary" />
+              <div className="space-y-2 rounded-xl border border-border bg-accent/30 p-3">
+                <label className="block text-xs font-bold text-muted-foreground uppercase tracking-wider">Product Image</label>
+                
+                {image ? (
+                  <div className="relative h-28 w-full rounded-lg overflow-hidden border border-border bg-card">
+                    <img src={image} alt="Preview" className="h-full w-full object-cover" />
+                    <button 
+                      type="button" 
+                      onClick={() => setImage("")}
+                      className="absolute top-1 right-1 grid h-6 w-6 place-items-center rounded-full bg-destructive text-destructive-foreground shadow-card"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </div>
+                ) : (
+                  <div className="flex flex-col items-center justify-center border border-dashed border-border rounded-lg p-4 bg-card hover:bg-accent/20 transition-all relative">
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={handleFileChange}
+                      className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+                      disabled={uploadProgress !== null}
+                    />
+                    <Upload className="h-6 w-6 text-muted-foreground mb-1" />
+                    <span className="text-xs font-semibold">Upload from device</span>
+                    <span className="text-[10px] text-muted-foreground mt-0.5">PNG, JPG, JPEG up to 5MB</span>
+                  </div>
+                )}
+
+                {uploadProgress !== null && (
+                  <div className="space-y-1">
+                    <div className="w-full bg-accent rounded-full h-1.5 overflow-hidden">
+                      <div className="bg-primary h-1.5 rounded-full transition-all duration-300" style={{ width: `${uploadProgress}%` }}></div>
+                    </div>
+                    <span className="text-[10px] text-muted-foreground">Uploading: {uploadProgress}%</span>
+                  </div>
+                )}
+
+                <div className="flex items-center gap-2 pt-1 border-t border-border/50 mt-1">
+                  <span className="text-[10px] text-muted-foreground shrink-0">Or paste URL:</span>
+                  <input 
+                    value={image} 
+                    onChange={(e) => setImage(e.target.value)} 
+                    placeholder="https://example.com/image.jpg" 
+                    className="flex-1 rounded-lg border border-border bg-card px-2.5 py-1.5 text-xs outline-none focus:border-primary" 
+                  />
+                </div>
+              </div>
               <div className="space-y-2">
                 {subItems.map((item, index) => (
                   <div key={index} className="grid grid-cols-[1fr_110px_36px] gap-2">
