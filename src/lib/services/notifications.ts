@@ -1,5 +1,5 @@
 import { getToken } from "firebase/messaging";
-import { arrayUnion, collection, doc, onSnapshot, orderBy, query, serverTimestamp, updateDoc, where } from "firebase/firestore";
+import { addDoc, arrayUnion, collection, doc, onSnapshot, orderBy, query, serverTimestamp, updateDoc, where } from "firebase/firestore";
 import { firestore, getFirebaseMessaging } from "@/lib/firebase";
 import type { AppNotification } from "@/lib/types";
 
@@ -21,14 +21,19 @@ export async function registerFcmToken(uid: string) {
   if (permission !== "granted") return null;
   const messaging = await getFirebaseMessaging();
   if (!messaging) return null;
-  const token = await getToken(messaging, { vapidKey });
-  if (token) {
-    await updateDoc(doc(firestore, "users", uid), {
-      fcmTokens: arrayUnion(token),
-      updatedAt: serverTimestamp(),
-    });
+  try {
+    const token = await getToken(messaging, { vapidKey });
+    if (token) {
+      await updateDoc(doc(firestore, "users", uid), {
+        fcmTokens: arrayUnion(token),
+        updatedAt: serverTimestamp(),
+      });
+    }
+    return token;
+  } catch (error) {
+    console.warn("FCM token registration failed:", error);
+    return null;
   }
-  return token;
 }
 
 export async function markNotificationsRead(userId: string, items: AppNotification[]) {
@@ -38,4 +43,25 @@ export async function markNotificationsRead(userId: string, items: AppNotificati
       .filter((item) => item.unread)
       .map((item) => updateDoc(doc(firestore!, "notifications", item.id), { unread: false, updatedAt: serverTimestamp() })),
   );
+}
+
+/** Create an in-app notification for a user */
+export async function createNotification(userId: string, data: { title: string; body: string; type: "order" | "system"; orderId?: string }) {
+  if (!firestore) return;
+  await addDoc(collection(firestore, "notifications"), {
+    userId,
+    type: data.type,
+    title: data.title,
+    body: data.body,
+    orderId: data.orderId ?? null,
+    unread: true,
+    createdAt: serverTimestamp(),
+  });
+}
+
+/** Send notification to FCM server endpoint for push delivery */
+export async function sendPushNotification(userId: string, title: string, body: string) {
+  // The FCM server will be deployed on Render
+  // For now, we create in-app notifications which are always visible
+  await createNotification(userId, { title, body, type: "order" });
 }

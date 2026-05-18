@@ -9,6 +9,7 @@ import {
 } from "@tanstack/react-router";
 import { Toaster } from "@/components/ui/sonner";
 import { AuthProvider } from "@/lib/AuthProvider";
+import { ChatBubble } from "@/components/ChatBubble";
 import { useApp } from "@/lib/store";
 import { useEffect } from "react";
 import appCss from "../styles.css?url";
@@ -93,6 +94,7 @@ function RootComponent() {
       <ThemeSync />
       <AuthProvider>
         <Outlet />
+        <ChatBubble />
         <Toaster position="top-center" richColors closeButton />
       </AuthProvider>
     </QueryClientProvider>

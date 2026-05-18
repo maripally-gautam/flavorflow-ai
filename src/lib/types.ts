@@ -12,7 +12,9 @@ export type UserProfile = {
   avatar?: string;
   businessName?: string;
   category?: SignupCategory;
+  customCategory?: string;
   fssaiVerified?: boolean;
+  fcmTokens?: string[];
   createdAt?: unknown;
   updatedAt?: unknown;
 };
@@ -90,6 +92,7 @@ export type VendorProfile = {
   ownerId: string;
   name: string;
   category: SignupCategory;
+  customCategory?: string;
   verified?: boolean;
   fssaiVerified?: boolean;
 };

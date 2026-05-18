@@ -34,6 +34,7 @@ function Signup() {
   const [location, setLocationValue] = useState("");
   const [businessName, setBusinessName] = useState("");
   const [category, setCategory] = useState<SignupCategory>("food");
+  const [customCategory, setCustomCategory] = useState("");
   const [license, setLicense] = useState<File | null>(null);
   const [licenseVerified, setLicenseVerified] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -42,9 +43,12 @@ function Signup() {
   const needsLicense = isAdminRole && category === "food";
   const detailsComplete = useMemo(() => {
     const base = name.trim() && phone.trim() && location.trim();
-    if (isAdminRole) return Boolean(base && businessName.trim() && category);
+    if (isAdminRole) {
+      const catOk = category !== "other" || customCategory.trim().length > 0;
+      return Boolean(base && businessName.trim() && category && catOk);
+    }
     return Boolean(base);
-  }, [businessName, category, isAdminRole, location, name, phone]);
+  }, [businessName, category, customCategory, isAdminRole, location, name, phone]);
 
   const routeForRole = (value?: UserRole | null) =>
     value === "vendor" || value === "admin" ? "/vendor" : value === "delivery" ? "/delivery" : "/home";
@@ -73,6 +77,7 @@ function Signup() {
         location: location.trim(),
         businessName: businessName.trim() || undefined,
         category: isAdminRole ? category : undefined,
+        customCategory: isAdminRole && category === "other" ? customCategory.trim() : undefined,
         fssaiVerified: needsLicense ? licenseVerified : undefined,
       });
       const resolvedRole = profile?.role ?? role;
@@ -125,7 +130,7 @@ function Signup() {
               {roleOptions.map((option) => {
                 const Icon = option.icon;
                 return (
-                  <button key={option.id} onClick={() => setRole(option.id)} className="flex w-full items-center gap-4 rounded-2xl border border-border bg-card p-4 text-left shadow-card">
+                  <button key={option.id} onClick={() => setRole(option.id)} className="flex w-full items-center gap-4 rounded-2xl border border-border bg-card p-4 text-left shadow-card transition-all hover:border-primary/40 hover:shadow-glow/20 active:scale-[0.98]">
                     <span className="grid h-12 w-12 place-items-center rounded-xl bg-primary text-primary-foreground">
                       <Icon className="h-5 w-5" />
                     </span>
@@ -154,6 +159,14 @@ function Signup() {
                   <select value={category} onChange={(e) => { setCategory(e.target.value as SignupCategory); setLicenseVerified(false); }} className="w-full rounded-2xl border border-border bg-card px-4 py-3 outline-none focus:border-primary">
                     {categories.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}
                   </select>
+                  {category === "other" && (
+                    <input
+                      value={customCategory}
+                      onChange={(e) => setCustomCategory(e.target.value)}
+                      placeholder="Enter your custom category name"
+                      className="w-full rounded-2xl border border-border bg-card px-4 py-3 outline-none focus:border-primary"
+                    />
+                  )}
                 </>
               )}
             </div>

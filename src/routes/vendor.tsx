@@ -1,14 +1,22 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { Plus, Settings, User, X } from "lucide-react";
+import { Plus, Settings, User, X, Trash2, Edit3, Package } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
+import { motion } from "framer-motion";
 import { AppShell } from "@/components/AppShell";
 import { useProducts, useVendorOrders } from "@/hooks/use-live-data";
 import { useAuth, useRequireRole } from "@/lib/AuthProvider";
-import { createProduct } from "@/lib/services/products";
+import { createProduct, deleteProduct } from "@/lib/services/products";
 import type { ProductSubItem } from "@/lib/types";
 
 export const Route = createFileRoute("/vendor")({ component: Vendor });
+
+const categoryLabels: Record<string, string> = {
+  food: "🍽️ Food",
+  "trip-kit": "🏕️ Trip Kit",
+  "gym-kit": "💪 Gym Kit",
+  other: "📦 Other",
+};
 
 function Vendor() {
   useRequireRole(["vendor", "admin"]);
@@ -22,6 +30,11 @@ function Vendor() {
   const [price, setPrice] = useState("");
   const [subItems, setSubItems] = useState<ProductSubItem[]>([{ name: "", quantity: "" }]);
   const [posting, setPosting] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  const categoryDisplay = profile?.category === "other" && profile?.customCategory
+    ? `📦 ${profile.customCategory}`
+    : categoryLabels[profile?.category ?? "other"] ?? "📦 Other";
 
   const publish = async () => {
     const cleanItems = subItems.filter((item) => item.name.trim() && item.quantity.trim());
@@ -60,6 +73,18 @@ function Vendor() {
     }
   };
 
+  const handleDelete = async (id: string) => {
+    setDeletingId(id);
+    try {
+      await deleteProduct(id);
+      toast.success("Post deleted");
+    } catch {
+      toast.error("Failed to delete");
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
   return (
     <AppShell hideNav>
       <div className="safe-top sticky top-0 z-30 border-b border-border bg-background/95 px-5 py-4 backdrop-blur">
@@ -80,10 +105,33 @@ function Vendor() {
       </div>
 
       <main className="mx-auto max-w-md space-y-6 p-5">
+        {/* Category Badge */}
+        <section className="rounded-2xl border border-border bg-card p-4">
+          <div className="flex items-center gap-3">
+            <div className="grid h-12 w-12 place-items-center rounded-xl bg-gradient-warm text-white">
+              <Package className="h-5 w-5" />
+            </div>
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Your Category</p>
+              <p className="font-display text-lg font-bold">{categoryDisplay}</p>
+            </div>
+          </div>
+          <p className="mt-2 text-xs text-muted-foreground">All your posts are automatically listed under this category for users to browse.</p>
+        </section>
+
+        {/* Posts */}
         <section className="space-y-3">
-          <h2 className="font-display text-lg font-bold">Your posts</h2>
+          <div className="flex items-center justify-between">
+            <h2 className="font-display text-lg font-bold">Your posts</h2>
+            <span className="rounded-full bg-accent px-3 py-1 text-xs font-bold">{products.length}</span>
+          </div>
           {products.map((product) => (
-            <article key={product.id} className="overflow-hidden rounded-2xl border border-border bg-card shadow-card">
+            <motion.article
+              key={product.id}
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="overflow-hidden rounded-2xl border border-border bg-card shadow-card"
+            >
               <img src={product.image} alt={product.name} className="h-44 w-full object-cover" />
               <div className="p-4">
                 <div className="flex items-start justify-between gap-3">
@@ -95,14 +143,28 @@ function Vendor() {
                     <p key={`${item.name}-${index}`} className="text-sm text-muted-foreground">{item.name}: {item.quantity}</p>
                   ))}
                 </div>
+                <div className="mt-3 flex gap-2">
+                  <button
+                    onClick={() => handleDelete(product.id)}
+                    disabled={deletingId === product.id}
+                    className="flex items-center gap-1.5 rounded-xl border border-destructive/30 px-3 py-2 text-xs font-semibold text-destructive disabled:opacity-50"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                    {deletingId === product.id ? "Deleting..." : "Delete"}
+                  </button>
+                </div>
               </div>
-            </article>
+            </motion.article>
           ))}
           {products.length === 0 && <p className="rounded-2xl border border-border bg-card p-6 text-center text-sm text-muted-foreground">No posts yet. Use add to publish your first item.</p>}
         </section>
 
+        {/* Orders */}
         <section className="space-y-3">
-          <h2 className="font-display text-lg font-bold">Paid orders</h2>
+          <div className="flex items-center justify-between">
+            <h2 className="font-display text-lg font-bold">Paid orders</h2>
+            <span className="rounded-full bg-accent px-3 py-1 text-xs font-bold">{orders.length}</span>
+          </div>
           {orders.map((order) => (
             <article key={order.id} className="rounded-2xl border border-border bg-card p-4 shadow-card">
               <div className="flex items-start justify-between gap-3">
@@ -128,7 +190,10 @@ function Vendor() {
         <div className="fixed inset-0 z-50 bg-black/45 px-4 py-8">
           <div className="mx-auto max-h-full max-w-md overflow-auto rounded-2xl bg-background p-5 shadow-2xl">
             <div className="flex items-center justify-between">
-              <h2 className="font-display text-xl font-bold">Add post</h2>
+              <div>
+                <h2 className="font-display text-xl font-bold">Add post</h2>
+                <p className="text-xs text-muted-foreground">Category: {categoryDisplay}</p>
+              </div>
               <button onClick={() => setOpen(false)} className="grid h-9 w-9 place-items-center rounded-xl border border-border">
                 <X className="h-4 w-4" />
               </button>

@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { onAuthChanged, getUserProfile } from "@/lib/services/auth";
+import { registerFcmToken } from "@/lib/services/notifications";
 import { isFirebaseConfigured } from "@/lib/firebase";
 import { useApp } from "@/lib/store";
 import type { UserProfile, UserRole } from "@/lib/types";
@@ -24,6 +25,7 @@ function routeForRole(role: UserRole) {
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [fcmRequested, setFcmRequested] = useState(false);
   const setUser = useApp((s) => s.setUser);
 
   const refreshProfile = async (uidOverride?: string) => {
@@ -52,6 +54,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setLoading(false);
     });
   }, [setUser]);
+
+  // Request FCM permission for customers only, once
+  useEffect(() => {
+    if (!profile || fcmRequested) return;
+    if (profile.role === "customer") {
+      setFcmRequested(true);
+      registerFcmToken(profile.uid).catch(console.warn);
+    }
+  }, [profile, fcmRequested]);
 
   const value = useMemo(
     () => ({ firebaseReady: isFirebaseConfigured, loading, profile, role: profile?.role ?? null, refreshProfile }),
